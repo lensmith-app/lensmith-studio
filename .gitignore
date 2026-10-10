@@ -1,2 +1,4 @@
 __pycache__/
 *.lensmith
+_test*
+web/_test*

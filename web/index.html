@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lensmith Studio</title>
+  <meta name="description" content="Build Lensmith camera filters in your browser, with a live webcam preview." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 108 108'><path fill='%23FF8A3D' d='M54,30a24,24 0,1 1,0 48a24,24 0,1 1,0 -48zM54,36a18,18 0,1 0,0 36a18,18 0,1 0,0 -36z'/><circle cx='54' cy='54' r='12' fill='%23E5532B'/></svg>" />
+  <link rel="stylesheet" href="css/studio.css" />
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="logo">◉</span> Lensmith <b>Studio</b></div>
+    <input id="name" class="name" maxlength="24" aria-label="Filter name" />
+    <div class="actions">
+      <button id="new" class="ghost" title="Start a new filter">New</button>
+      <button id="open" class="ghost" title="Open a .lensmith or filter.json">Open…</button>
+      <button id="save" title="Download a .lensmith file to open on your phone">Save .lensmith</button>
+      <input id="openFile" type="file" accept=".lensmith,.zip,.json" hidden />
+    </div>
+  </header>
+
+  <main>
+    <section class="stage">
+      <div id="preview" class="preview">
+        <canvas id="gl"></canvas>
+        <canvas id="overlay"></canvas>
+        <div id="startCard" class="start-card">
+          <h2>Live preview</h2>
+          <p>See your filter on your own face, exactly like the phone does.</p>
+          <button id="startCam">Turn on webcam</button>
+          <button id="usePhoto" class="ghost">Use a photo instead</button>
+          <input id="photoFile" type="file" accept="image/*" hidden />
+          <p class="small">Everything runs in your browser. Nothing is uploaded.</p>
+        </div>
+      </div>
+      <div class="stage-bar">
+        <span id="status" class="status">Camera off</span>
+        <label class="check"><input id="showPoints" type="checkbox" /> Face points</label>
+        <button id="switchSource" class="ghost small-btn" hidden>Change source</button>
+      </div>
+      <p class="hint">Drag stickers on your face to move them · scroll to resize · <kbd>Shift</kbd>+scroll to rotate · click to tap</p>
+    </section>
+
+    <section class="panel">
+      <nav id="tabs" class="tabs"></nav>
+      <div id="tab" class="tab"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <video id="video" playsinline muted hidden></video>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
