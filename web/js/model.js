@@ -31,6 +31,10 @@ export const TRIGGER_LABELS = {
 export const CONTINUOUS_TRIGGERS = new Set(["WhileMouthOpen", "WhileSmiling"]);
 export const BURST_STYLES = ["Explode", "Fountain", "Rain", "Stream"];
 export const DRAWINGS = ["DogEarLeft", "DogEarRight", "DogNose", "Tongue", "ClownNose", "Blush", "Crown"];
+export const FIRE_TRIGGERS = ["MouthOpen", "Tap", "Blink"];
+export const FIRE_LABELS = { MouthOpen: "Opening mouth", Tap: "Tapping", Blink: "Blinking" };
+/** The Nail It game needs this app version (versionCode) or newer. */
+export const NAIL_GAME_APP_VERSION = 4;
 
 export const EMOJI_CHOICES = [
   "👑", "🕶️", "😎", "❤️", "💕", "💖", "✨", "⭐", "🌟", "🔥", "💯", "🌸", "🌼", "🌺", "🌻", "🍀",
@@ -132,8 +136,12 @@ export function normalize(raw) {
   f.stickers = (raw.stickers ?? []).map((s) => ({ ...defaultSticker(s), ...s, ...artOnly(s) }));
   f.warps = (raw.warps ?? []).map((w) => ({ anchor: "LeftEye", radius: 0.25, strength: 0.4, ...w }));
   f.rules = (raw.rules ?? []).map((r) => ({ trigger: "Tap", cooldownMs: 250, ...r, actions: (r.actions ?? []).map(normalizeAction) }));
-  if (raw.game) f.game = { items: (raw.game.items ?? []).map(artOnly), durationSeconds: raw.game.durationSeconds ?? 30 };
-  else delete f.game;
+  if (raw.game?.type === "nails") {
+    f.game = { type: "nails", nails: Math.min(16, Math.max(2, raw.game.nails ?? 10)), fire: raw.game.fire ?? "MouthOpen" };
+  } else if (raw.game) {
+    f.game = { type: "catch", items: (raw.game.items ?? []).map(artOnly), durationSeconds: raw.game.durationSeconds ?? 30 };
+  } else delete f.game;
+  f.minAppVersion = requiredAppVersion(f);
   return f;
 }
 
@@ -152,8 +160,11 @@ export function newAction(type) {
   return normalizeAction(type === "burst" ? { type, emoji: "✨" } : { type });
 }
 
-/** Rules that use taps switch off double-tap-to-flip in the app. */
-export const usesTaps = (f) => f.rules.some((r) => r.trigger === "Tap");
+/** The oldest app that can show this filter. */
+export const requiredAppVersion = (f) => (f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION);
+
+/** Rules (or a game) that use taps switch off double-tap-to-flip in the app. */
+export const usesTaps = (f) => f.rules.some((r) => r.trigger === "Tap") || (f.game?.type === "nails" && f.game.fire === "Tap");
 export const isInteractive = (f) => f.rules.length > 0 || !!f.game;
 export const needsFaces = (f) => f.stickers.length > 0 || f.warps.length > 0 || isInteractive(f);
 export const needsMask = (f) => f.background !== "None";
@@ -164,7 +175,7 @@ export function imagePaths(f) {
   const visit = (o) => { if (o && o.image) out.add(o.image); };
   f.stickers.forEach(visit);
   f.rules.forEach((r) => r.actions.forEach(visit));
-  f.game?.items.forEach(visit);
+  f.game?.items?.forEach(visit);
   return [...out];
 }
 

@@ -75,6 +75,10 @@ function drawing(name) {
     case "ClownNose": return clownNose();
     case "Blush": return blush();
     case "Crown": return crown();
+    case "WoodPlank": return woodPlank();
+    case "Nail": return nail();
+    case "Bullet": return bullet();
+    case "Pistol": return pistol();
     default: return emoji("❓");
   }
 }
@@ -194,5 +198,95 @@ function crown() {
   dot(120, 222, 12, "rgb(30,144,255)");
   dot(280, 222, 12, "rgb(30,144,255)");
   dot(200, 160, 14, "rgb(0,168,107)");
+  return c;
+}
+
+// ---- Nail It game pieces (ports of the app's StickerBitmaps.kt) ----
+
+function woodPlank() {
+  const c = makeCanvas(160, 210);
+  const g = c.getContext("2d");
+  const base = g.createLinearGradient(0, 0, 160, 0);
+  base.addColorStop(0, "rgb(222,160,82)");
+  base.addColorStop(0.5, "rgb(240,186,104)");
+  base.addColorStop(1, "rgb(222,160,82)");
+  g.fillStyle = base;
+  g.fillRect(0, 0, 160, 210);
+  g.strokeStyle = "rgba(120,70,20,0.27)";
+  g.lineWidth = 3;
+  for (const x of [28, 61, 97, 131]) {
+    g.beginPath();
+    g.moveTo(x, 0);
+    g.bezierCurveTo(x + 8, 70, x - 8, 140, x + 4, 210);
+    g.stroke();
+  }
+  g.beginPath();
+  g.ellipse(102, 87, 10, 17, 0, 0, Math.PI * 2);
+  g.stroke();
+  g.fillStyle = "rgb(150,92,38)";
+  g.fillRect(0, 200, 160, 10);
+  g.fillStyle = "rgba(255,230,180,0.35)";
+  g.fillRect(0, 0, 160, 3);
+  return c;
+}
+
+function nail() {
+  const c = makeCanvas(300, 44);
+  const g = c.getContext("2d");
+  const steel = g.createLinearGradient(0, 12, 0, 32);
+  steel.addColorStop(0, "rgb(235,238,242)");
+  steel.addColorStop(1, "rgb(120,126,134)");
+  g.fillStyle = steel;
+  g.beginPath();
+  [[0, 22], [22, 14], [280, 14], [280, 30], [22, 30]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+  g.fill();
+  const head = g.createLinearGradient(272, 0, 296, 0);
+  head.addColorStop(0, "rgb(170,175,182)");
+  head.addColorStop(1, "rgb(90,95,102)");
+  g.fillStyle = head;
+  g.beginPath();
+  g.roundRect(272, 2, 24, 40, 6);
+  g.fill();
+  return c;
+}
+
+function bullet() {
+  const c = makeCanvas(40, 100);
+  const g = c.getContext("2d");
+  const brass = g.createLinearGradient(4, 0, 36, 0);
+  brass.addColorStop(0, "rgb(255,214,102)");
+  brass.addColorStop(1, "rgb(196,140,30)");
+  g.fillStyle = brass;
+  g.fillRect(4, 42, 32, 56);
+  g.fillStyle = "rgb(205,120,70)";
+  g.beginPath();
+  g.moveTo(4, 44);
+  g.bezierCurveTo(4, 10, 20, 0, 20, 0);
+  g.bezierCurveTo(20, 0, 36, 10, 36, 44);
+  g.fill();
+  g.fillStyle = "rgb(170,120,25)";
+  g.fillRect(4, 90, 32, 8);
+  return c;
+}
+
+function pistol() {
+  const c = makeCanvas(200, 280);
+  const g = c.getContext("2d");
+  const rr = (x, y, w, h, r, color) => { g.fillStyle = color; g.beginPath(); g.roundRect(x, y, w, h, r); g.fill(); };
+  rr(70, 0, 60, 170, 10, "rgb(60,64,72)");
+  g.fillStyle = "rgb(35,37,43)";
+  g.fillRect(88, 0, 24, 10);
+  rr(60, 150, 80, 40, 12, "rgb(60,64,72)");
+  g.fillStyle = "rgb(110,70,40)";
+  g.beginPath();
+  [[70, 180], [140, 180], [150, 275], [80, 275]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+  g.fill();
+  g.strokeStyle = "rgb(60,64,72)";
+  g.lineWidth = 8;
+  g.beginPath();
+  g.arc(54, 200, 22, 0, Math.PI * 2);
+  g.stroke();
+  g.fillStyle = "rgba(255,255,255,0.31)";
+  g.fillRect(78, 20, 6, 120);
   return c;
 }

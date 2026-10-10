@@ -8,6 +8,10 @@ const TILT_DEGREES = 18;
 const STREAM_INTERVAL_MS = 60;
 const MAX_PARTICLES = 220;
 const POPUP_SECONDS = 1.3;
+const BULLET_SPEED = 1.9;
+// The Studio shows the whole frame (the phone may crop the sides), so everything is visible.
+const VISIBLE_WIDTH = 1;
+const VISIBLE_HEIGHT = 1;
 const rand = Math.random;
 
 export class InteractionEngine {
@@ -43,6 +47,14 @@ export class InteractionEngine {
     this.gameState = "Waiting";
     this.lastMs = -1;
     this.prev = { mouth: false, blink: false, smile: false, tilt: 0 };
+    this.nails = [];
+    this.bullets = [];
+    this.nailState = "Waiting";
+    this.nailTime = 0;
+    this.nailScore = 0;
+    this.nailOverTime = 0;
+    this.gunX = 0.5;
+    this.gunKick = 0;
   }
 
   /**
@@ -99,7 +111,11 @@ export class InteractionEngine {
       }
     });
 
-    if (f.game) this.updateGame(f.game, face, dt, fired.some(([t]) => t === "MouthOpen"));
+    if (f.game?.type === "nails") {
+      this.updateNails(f.game, face, dt, fired.some(([t]) => t === f.game.fire));
+    } else if (f.game) {
+      this.updateGame(f.game, face, dt, fired.some(([t]) => t === "MouthOpen"));
+    }
     this.animate(dt);
   }
 
@@ -198,6 +214,107 @@ export class InteractionEngine {
     }
   }
 
+  // ---- Nail It (port of the app's InteractionEngine.kt) ----
+  get visibleLeft() { return 0.5 - VISIBLE_WIDTH / 2; }
+  get visibleRight() { return 0.5 + VISIBLE_WIDTH / 2; }
+  get visibleBottom() { return this.aspect * (0.5 - VISIBLE_HEIGHT / 2); }
+  get visibleTop() { return this.aspect * (0.5 + VISIBLE_HEIGHT / 2); }
+  get wallWidth() { return 0.13 * VISIBLE_WIDTH; }
+  get nailLength() { return 0.17 * VISIBLE_WIDTH; }
+  get gunY() { return this.visibleBottom + 0.42 * this.aspect * VISIBLE_HEIGHT; }
+
+  setUpNails(count) {
+    const bottom = this.visibleBottom + 0.54 * this.aspect * VISIBLE_HEIGHT;
+    const top = this.visibleTop - 0.13 * this.aspect * VISIBLE_HEIGHT;
+    const left = Math.ceil(count / 2), right = Math.floor(count / 2);
+    const step = (top - bottom) / Math.max(left, 1);
+    this.nails = [];
+    for (let i = 0; i < left; i++) this.nails.push({ leftWall: true, y: bottom + step * i, out: 1, hit: false });
+    for (let i = 0; i < right; i++) this.nails.push({ leftWall: false, y: bottom + step * i + step / 2, out: 1, hit: false });
+  }
+
+  nailSpan(n) {
+    const reach = this.nailLength * n.out + 0.02;
+    if (n.leftWall) { const wall = this.visibleLeft + this.wallWidth; return [wall, wall + reach]; }
+    const wall = this.visibleRight - this.wallWidth;
+    return [wall - reach, wall];
+  }
+
+  updateNails(game, face, dt, fire) {
+    if (!this.nails.length) this.setUpNails(game.nails);
+    const lo = this.visibleLeft + this.wallWidth + 0.06, hi = this.visibleRight - this.wallWidth - 0.06;
+    const target = Math.min(hi, Math.max(lo, face ? face.anchors.NoseTip[0] : 0.5));
+    this.gunX += (target - this.gunX) * Math.min(dt * 14, 1);
+    this.gunKick = Math.max(0, this.gunKick - dt * 6);
+
+    if (this.nailState === "Waiting") {
+      if (fire) { this.startNails(game); this.shoot(); }
+    } else if (this.nailState === "Playing") {
+      this.nailTime += dt;
+      if (fire) this.shoot();
+      this.bullets = this.bullets.filter((b) => {
+        const before = b.y;
+        b.y += BULLET_SPEED * dt;
+        const hit = this.nails.find((n) => {
+          const [from, to] = this.nailSpan(n);
+          return !n.hit && n.y > before && n.y <= b.y && b.x >= from - 0.012 && b.x <= to + 0.012;
+        });
+        if (hit) {
+          hit.hit = true;
+          this.nailScore++;
+          const [from, to] = this.nailSpan(hit);
+          const headX = hit.leftWall ? to : from;
+          this.burst({ emoji: "💥", count: 1, size: 0.5, style: "Explode" }, null, [headX, hit.y]);
+          this.burst({ emoji: "✨", count: 6, size: 0.12, style: "Explode" }, null, [headX, hit.y]);
+          return false;
+        }
+        return b.y <= this.visibleTop + 0.1;
+      });
+      if (this.nailScore >= this.nails.length) {
+        this.nailState = "Over";
+        this.nailOverTime = 0;
+        this.bullets = [];
+        this.popupText = "Nailed it! 🔨";
+        this.popupAge = 0;
+      }
+    } else {
+      this.nailOverTime += dt;
+      if (this.nailOverTime > 2 && fire) this.startNails(game);
+    }
+    for (const n of this.nails) if (n.hit) n.out = Math.max(0, n.out - dt * 7);
+  }
+
+  startNails(game) {
+    this.setUpNails(game.nails);
+    Object.assign(this, { bullets: [], nailState: "Playing", nailTime: 0, nailScore: 0, popupText: null });
+  }
+
+  shoot() {
+    if (this.bullets.length >= 3) return;
+    this.bullets.push({ x: this.gunX, y: this.gunY + 0.1 });
+    this.gunKick = 1;
+  }
+
+  drawNailGame(sprite) {
+    for (const n of this.nails) {
+      const [from, to] = this.nailSpan(n);
+      const len = this.nailLength + 0.03;
+      const headX = n.leftWall ? to : from;
+      sprite({ drawing: "Nail" }, n.leftWall ? headX - len / 2 : headX + len / 2, n.y, len, n.leftWall ? 0 : Math.PI);
+    }
+    const plankHeight = this.wallWidth * (210 / 160);
+    for (let y = this.visibleBottom + plankHeight / 2; y - plankHeight / 2 < this.visibleTop; y += plankHeight) {
+      sprite({ drawing: "WoodPlank" }, this.visibleLeft + this.wallWidth / 2, y, this.wallWidth, 0);
+      sprite({ drawing: "WoodPlank" }, this.visibleRight - this.wallWidth / 2, y, this.wallWidth, 0);
+    }
+    for (const n of this.nails.filter((x) => x.out < 0.05)) {
+      const headX = n.leftWall ? this.visibleLeft + this.wallWidth + 0.008 : this.visibleRight - this.wallWidth - 0.008;
+      sprite({ drawing: "Nail" }, headX, n.y, 0.06, n.leftWall ? 0 : Math.PI);
+    }
+    for (const b of this.bullets) sprite({ drawing: "Bullet" }, b.x, b.y, 0.03, 0);
+    sprite({ drawing: "Pistol" }, this.gunX, this.gunY - this.gunKick * 0.02, 0.13, 0);
+  }
+
   startGame() {
     Object.assign(this, { gameState: "Playing", gameTime: 0, nextSpawn: 0.3, score: 0, items: [] });
   }
@@ -214,7 +331,7 @@ export class InteractionEngine {
     });
     if (this.popupText !== null) {
       this.popupAge += dt;
-      if (this.popupAge > POPUP_SECONDS && this.gameState !== "Over") this.popupText = null;
+      if (this.popupAge > POPUP_SECONDS && this.gameState !== "Over" && this.nailState !== "Over") this.popupText = null;
     }
     this.flashAlpha = Math.max(0, this.flashAlpha - dt * 3);
   }
@@ -236,6 +353,7 @@ export class InteractionEngine {
       ctx.drawImage(a.canvas, (-w * k) / 2, (-w * k * a.aspect) / 2, w * k, w * k * a.aspect);
       ctx.restore();
     };
+    if (f.game?.type === "nails") this.drawNailGame(sprite);
     for (const it of this.items) sprite(it.art, it.x, it.y, 0.16, it.angle);
     for (const p of this.particles) sprite(p.art, p.x, p.y, p.size, p.angle, Math.min(p.life / 0.35, 1));
 
@@ -251,7 +369,18 @@ export class InteractionEngine {
     };
 
     const hudY = 0.12 * k;
-    if (f.game) {
+    if (f.game?.type === "nails") {
+      const action = { MouthOpen: "Open your mouth", Tap: "Tap", Blink: "Blink" }[f.game.fire];
+      if (this.nailState === "Waiting") {
+        text(`0/${f.game.nails}`, k / 2, hudY, 0.11 * k);
+        text(`${action} to shoot!`, k / 2, hudY + 0.12 * k, 0.06 * k);
+      } else if (this.nailState === "Playing") {
+        text(`${this.nailScore}/${this.nails.length}`, k / 2, hudY, 0.11 * k);
+      } else {
+        text(`${this.nailTime.toFixed(1)}s`, k / 2, hudY, 0.09 * k);
+        if (this.nailOverTime > 2) text(`${action} to play again`, k / 2, hudY + 0.11 * k, 0.055 * k);
+      }
+    } else if (f.game) {
       if (this.gameState === "Waiting") text("Open your mouth to play!", k / 2, hudY, 0.07 * k);
       else if (this.gameState === "Playing") {
         const left = Math.max(0, Math.floor(f.game.durationSeconds - this.gameTime));
@@ -264,7 +393,7 @@ export class InteractionEngine {
 
     if (this.popupText !== null) {
       const pop = 1 + 0.35 * (1 - Math.min(this.popupAge / 0.15, 1));
-      const fade = this.gameState === "Over" ? 1 : Math.min(Math.max((POPUP_SECONDS - this.popupAge) / 0.4, 0), 1);
+      const fade = this.gameState === "Over" || this.nailState === "Over" ? 1 : Math.min(Math.max((POPUP_SECONDS - this.popupAge) / 0.4, 0), 1);
       text(this.popupText, k / 2, height / 2, 0.13 * k * pop, fade);
     }
 

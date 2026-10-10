@@ -1,7 +1,7 @@
 // .lensmith packages (zip: filter.json + assets/) and store submissions.
 
 import JSZip from "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm";
-import { imagePaths, normalize } from "./model.js";
+import { imagePaths, normalize, requiredAppVersion } from "./model.js";
 
 const ALLOWED = /^assets\/[^/]+\.(png|webp|jpe?g)$/i;
 const MAX_FILES = 200;
@@ -33,7 +33,7 @@ export async function openFile(file) {
 /** Builds a .lensmith package with only the pictures the filter uses. */
 export async function saveLensmith(filter, assets) {
   const zip = new JSZip();
-  zip.file("filter.json", JSON.stringify(filter, null, 2));
+  zip.file("filter.json", JSON.stringify({ ...filter, minAppVersion: requiredAppVersion(filter) }, null, 2));
   for (const path of imagePaths(filter)) {
     const blob = assets.get(path);
     if (blob) zip.file(path, blob);
@@ -48,7 +48,7 @@ export async function saveLensmith(filter, assets) {
 export async function buildSubmission({ filter, assets, github, slug, listing, thumbnail }) {
   const zip = new JSZip();
   const dir = zip.folder("filters").folder(github).folder(slug);
-  const manifest = { ...filter, id: `${github}.${slug}` };
+  const manifest = { ...filter, id: `${github}.${slug}`, minAppVersion: requiredAppVersion(filter) };
   dir.file("filter.json", JSON.stringify(manifest, null, 2));
   dir.file("listing.json", JSON.stringify(listing, null, 2));
   if (thumbnail) dir.file("thumbnail.png", thumbnail);

@@ -259,15 +259,26 @@ function interactTab(app) {
     h("input", { type: "checkbox", checked: f.doubleTapFlip && !tapRule, disabled: tapRule, onchange: (e) => { f.doubleTapFlip = e.target.checked; app.changed(); } }),
     " Double-tap flips camera", tapRule ? h("span.muted", {}, " — off automatically, this filter reacts to taps") : ""));
 
-  out.push(h("h3", {}, "Mini-game: Catch"));
-  out.push(h("label.check", {},
-    h("input", { type: "checkbox", checked: !!f.game, onchange: (e) => {
-      if (e.target.checked) f.game = { items: [{ emoji: "🍔" }, { emoji: "🍕" }, { emoji: "🍩" }], durationSeconds: 30 };
-      else delete f.game;
-      app.changed(true);
-    } }),
-    " Things fall — move your head and open your mouth to eat them"));
-  if (f.game) {
+  out.push(h("h3", {}, "Mini-game"));
+  const kind = f.game?.type === "nails" ? "Nail It" : f.game ? "Catch" : "None";
+  out.push(chips(["None", "Catch", "Nail It"], kind, (x) => x, (x) => {
+    if (x === "Catch") f.game = { type: "catch", items: [{ emoji: "🍔" }, { emoji: "🍕" }, { emoji: "🍩" }], durationSeconds: 30 };
+    else if (x === "Nail It") f.game = { type: "nails", nails: 10, fire: "MouthOpen" };
+    else delete f.game;
+    f.minAppVersion = M.requiredAppVersion(f);
+    app.changed(true);
+  }));
+  out.push(h("p.muted", {}, {
+    Catch: "Things fall — move your head and open your mouth to eat them.",
+    "Nail It": "Wooden walls full of nails. The gun follows your nose — shoot every nail into the wall. Needs Lensmith 0.4+.",
+    None: "Add a game to your filter.",
+  }[kind]));
+  if (f.game?.type === "nails") {
+    const g = f.game;
+    out.push(slider("Nails", g.nails, 4, 16, 1, (v) => { g.nails = v; app.changed(); }, (v) => String(v)));
+    out.push(h("div.muted", { style: { margin: "4px 0" } }, "Shoot by"));
+    out.push(chips(M.FIRE_TRIGGERS, g.fire, (x) => M.FIRE_LABELS[x], (x) => { g.fire = x; app.changed(true); }));
+  } else if (f.game) {
     const g = f.game;
     const has = (art) => g.items.some((it) => M.artKey(it) === M.artKey(art));
     const toggle = (art) => {
