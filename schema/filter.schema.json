@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lensmith-app.github.io/lensmith-studio/schema/filter.schema.json",
+  "title": "Lensmith filter",
+  "description": "filter.json inside a .lensmith package. See docs/filter-format.md.",
+  "type": "object",
+  "required": ["id", "name"],
+  "properties": {
+    "formatVersion": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "minAppVersion": { "type": "integer", "minimum": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 24 },
+    "brightness": { "type": "number", "minimum": -1, "maximum": 1 },
+    "contrast": { "type": "number", "minimum": 0, "maximum": 2 },
+    "saturation": { "type": "number", "minimum": 0, "maximum": 2 },
+    "warmth": { "type": "number", "minimum": -1, "maximum": 1 },
+    "tint": { "type": "number", "minimum": -1, "maximum": 1 },
+    "fade": { "type": "number", "minimum": 0, "maximum": 1 },
+    "vignette": { "type": "number", "minimum": 0, "maximum": 1 },
+    "grain": { "type": "number", "minimum": 0, "maximum": 1 },
+    "colorize": { "$ref": "#/$defs/color" },
+    "colorizeAmount": { "type": "number", "minimum": 0, "maximum": 1 },
+    "effect": { "enum": ["None", "Mirror", "Pixelate", "Sketch", "Thermal", "Posterize", "Invert", "RgbSplit"] },
+    "effectParam": { "type": "number" },
+    "stickers": { "type": "array", "items": { "$ref": "#/$defs/sticker" } },
+    "warps": { "type": "array", "items": { "$ref": "#/$defs/warp" } },
+    "background": { "enum": ["None", "Blur", "ColorPop", "Gradient", "Galaxy", "Image"] },
+    "backgroundTop": { "$ref": "#/$defs/color" },
+    "backgroundBottom": { "$ref": "#/$defs/color" },
+    "rules": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
+    "game": { "$ref": "#/$defs/game" },
+    "doubleTapFlip": { "type": "boolean" }
+  },
+  "$defs": {
+    "color": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "minItems": 3, "maxItems": 3 },
+    "anchor": { "enum": ["Forehead", "BetweenEyes", "LeftEye", "RightEye", "NoseTip", "Mouth", "Chin", "LeftCheek", "RightCheek"] },
+    "art": {
+      "oneOf": [
+        { "type": "object", "required": ["emoji"] },
+        { "type": "object", "required": ["drawing"], "properties": { "drawing": { "enum": ["DogEarLeft", "DogEarRight", "DogNose", "Tongue", "ClownNose", "Blush", "Crown"] } } },
+        { "type": "object", "required": ["image"], "properties": { "image": { "type": "string", "pattern": "^assets/[^/]+\\.(png|webp|jpe?g)$" } } }
+      ]
+    },
+    "sticker": {
+      "allOf": [{ "$ref": "#/$defs/art" }],
+      "type": "object",
+      "properties": {
+        "anchor": { "$ref": "#/$defs/anchor" },
+        "offsetX": { "type": "number" },
+        "offsetY": { "type": "number" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "rotation": { "type": "number" },
+        "showWhen": { "enum": ["Always", "MouthOpen", "MouthClosed", "Smiling", "EyesClosed"] },
+        "hidden": { "type": "boolean" }
+      }
+    },
+    "warp": {
+      "type": "object",
+      "properties": {
+        "anchor": { "$ref": "#/$defs/anchor" },
+        "radius": { "type": "number", "exclusiveMinimum": 0 },
+        "strength": { "type": "number", "minimum": -1, "maximum": 1 }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "required": ["trigger", "actions"],
+      "properties": {
+        "trigger": { "enum": ["Start", "MouthOpen", "MouthClose", "Blink", "Smile", "TiltLeft", "TiltRight", "Tap", "EveryTwoSeconds", "WhileMouthOpen", "WhileSmiling"] },
+        "cooldownMs": { "type": "integer", "minimum": 0 },
+        "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["burst", "show", "hide", "toggle", "score", "popup", "flash"] },
+        "anchor": { "$ref": "#/$defs/anchor" },
+        "count": { "type": "integer", "minimum": 1, "maximum": 60 },
+        "style": { "enum": ["Explode", "Fountain", "Rain", "Stream"] },
+        "size": { "type": "number", "exclusiveMinimum": 0 },
+        "index": { "type": "integer", "minimum": 0 },
+        "points": { "type": "integer" },
+        "text": { "type": "string", "maxLength": 30 },
+        "color": { "$ref": "#/$defs/color" }
+      }
+    },
+    "game": {
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/art" }, "minItems": 1 },
+        "durationSeconds": { "type": "integer", "minimum": 5, "maximum": 120 }
+      }
+    }
+  }
+}
