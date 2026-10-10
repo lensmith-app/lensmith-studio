@@ -89,8 +89,11 @@
     "game": {
       "type": "object",
       "properties": {
+        "type": { "enum": ["catch", "nails"] },
         "items": { "type": "array", "items": { "$ref": "#/$defs/art" }, "minItems": 1 },
-        "durationSeconds": { "type": "integer", "minimum": 5, "maximum": 120 }
+        "durationSeconds": { "type": "integer", "minimum": 5, "maximum": 120 },
+        "nails": { "type": "integer", "minimum": 2, "maximum": 16 },
+        "fire": { "enum": ["MouthOpen", "Tap", "Blink"] }
       }
     }
   }

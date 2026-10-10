@@ -95,9 +95,22 @@ Actions:
 
 ### Game
 
+One mini-game per filter, chosen by `type`:
+
+**Catch** (`"type": "catch"`, the default): things fall; open your mouth to eat them.
+
 ```json
-{ "items": [ { "emoji": "🍔" }, { "image": "assets/coin.png" } ], "durationSeconds": 30 }
+{ "type": "catch", "items": [ { "emoji": "🍔" }, { "image": "assets/coin.png" } ], "durationSeconds": 30 }
 ```
+
+**Nail It** (`"type": "nails"`, needs `minAppVersion` 4): wooden walls full of nails; a gun follows
+your nose and shoots straight up. Drive every nail in.
+
+```json
+{ "type": "nails", "nails": 10, "fire": "MouthOpen" }
+```
+
+`nails`: 2–16. `fire`: `MouthOpen`, `Tap` or `Blink`.
 
 ## Versioning
 
