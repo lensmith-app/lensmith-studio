@@ -12,7 +12,10 @@ var BULLET_SPEED = 1.5; // screen widths per second
 var BULLET_SIZE = 0.012;
 var SWING_SPEED = 2.2;  // how fast the gun swings
 var AIM_LOW = 148;      // gun angle range in degrees (90 = straight up, 180 = left)
-var AIM_HIGH = 178;     // the perfect shots are shallow: about 170-172° and 177-178°
+var AIM_HIGH = 178;
+var GUN_Y = 0.47;       // gun height, as a fraction of the screen (above the camera controls)
+var NAILS_FROM = 0.56;  // nails run from here up to NAILS_TO below the top
+var NAILS_TO = 0.12;
 
 var nails = [];
 var bullet = null;
@@ -27,8 +30,8 @@ function start(lens) {
 
 function newRound(lens) {
   var s = lens.screen;
-  var bottom = s.bottom + s.height * 0.42;
-  var top = s.top - s.height * 0.12;
+  var bottom = s.bottom + s.height * NAILS_FROM;
+  var top = s.top - s.height * NAILS_TO;
   var perSide = Math.floor(NAILS / 2);
   var step = (top - bottom) / perSide;
   nails = [];
@@ -45,7 +48,7 @@ function newRound(lens) {
 function gun(lens) {
   var s = lens.screen;
   var angle = AIM_LOW + (AIM_HIGH - AIM_LOW) * (0.5 + 0.5 * Math.sin(swing));
-  return { x: s.right - WALL - 0.1, y: s.bottom + s.height * 0.32, angle: angle };
+  return { x: s.right - WALL - 0.1, y: s.bottom + s.height * GUN_Y, angle: angle };
 }
 
 // The span a nail covers, from the wall out to its head.
