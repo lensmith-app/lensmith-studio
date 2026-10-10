@@ -4,19 +4,22 @@
     python lensmith_cli.py pack   <folder> [out.lensmith]
     python lensmith_cli.py unpack <file.lensmith> <folder>
 
-A filter folder holds filter.json and an optional assets/ folder (png, webp, jpg).
+A filter folder holds filter.json, an optional script.js and an optional assets/ folder (png, webp, jpg).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import zipfile
 from pathlib import Path
 
 FORMAT_VERSION = 2
 ALLOWED_ASSETS = {".png", ".webp", ".jpg", ".jpeg"}
+SCRIPT_FILE = "script.js"
+MAX_SCRIPT_BYTES = 256 * 1024
 MAX_FILES = 200
 MAX_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_SIDE = 2048
@@ -56,6 +59,19 @@ def check(folder: Path) -> list[str]:
         elif not target.exists():
             errors.append(f"picture '{ref}' is missing")
 
+    script = folder / SCRIPT_FILE
+    if "script" in data:
+        if data["script"] != SCRIPT_FILE:
+            errors.append(f'"script" must be "{SCRIPT_FILE}"')
+        elif not script.exists():
+            errors.append("filter.json uses a script but script.js is missing")
+        elif script.stat().st_size > MAX_SCRIPT_BYTES:
+            errors.append("script.js is larger than 256 KB")
+        else:
+            for ref in sorted(set(re.findall(r"assets/[A-Za-z0-9._-]+", script.read_text(encoding="utf-8")))):
+                if not (folder / ref).exists():
+                    errors.append(f"script.js: picture '{ref}' is missing")
+
     files = [p for p in folder.rglob("*") if p.is_file()]
     if len(files) > MAX_FILES:
         errors.append(f"more than {MAX_FILES} files")
@@ -81,6 +97,8 @@ def check(folder: Path) -> list[str]:
 def pack(folder: Path, out: Path) -> None:
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(folder / "filter.json", "filter.json")
+        if (folder / SCRIPT_FILE).exists():
+            z.write(folder / SCRIPT_FILE, SCRIPT_FILE)
         for p in sorted((folder / "assets").glob("*")) if (folder / "assets").exists() else []:
             if p.is_file():
                 z.write(p, f"assets/{p.name}")
@@ -96,7 +114,7 @@ def unpack(package: Path, out: Path) -> None:
             target = (out / info.filename).resolve()
             if root not in target.parents:
                 raise ValueError(f"unsafe path in package: {info.filename}")
-            ok = info.filename == "filter.json" or (
+            ok = info.filename in ("filter.json", SCRIPT_FILE) or (
                 info.filename.startswith("assets/") and Path(info.filename).suffix.lower() in ALLOWED_ASSETS
             )
             if not ok:

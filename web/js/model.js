@@ -35,6 +35,9 @@ export const FIRE_TRIGGERS = ["MouthOpen", "Tap", "Blink"];
 export const FIRE_LABELS = { MouthOpen: "Opening mouth", Tap: "Tapping", Blink: "Blinking" };
 /** The Nail It game needs this app version (versionCode) or newer. */
 export const NAIL_GAME_APP_VERSION = 4;
+/** Filters with a script need this app version (versionCode) or newer. */
+export const SCRIPT_APP_VERSION = 5;
+export const SCRIPT_FILE = "script.js";
 
 export const EMOJI_CHOICES = [
   "👑", "🕶️", "😎", "❤️", "💕", "💖", "✨", "⭐", "🌟", "🔥", "💯", "🌸", "🌼", "🌺", "🌻", "🍀",
@@ -161,11 +164,16 @@ export function newAction(type) {
 }
 
 /** The oldest app that can show this filter. */
-export const requiredAppVersion = (f) => (f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION);
+export const requiredAppVersion = (f) =>
+  f.script ? SCRIPT_APP_VERSION : f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION;
+
+/** Pictures a script refers to by name, e.g. lens.sprite("assets/gun.png", ...). */
+export const scriptAssets = (source) => [...new Set((source || "").match(/assets\/[A-Za-z0-9._-]+/g) || [])];
 
 /** Rules (or a game) that use taps switch off double-tap-to-flip in the app. */
-export const usesTaps = (f) => f.rules.some((r) => r.trigger === "Tap") || (f.game?.type === "nails" && f.game.fire === "Tap");
-export const isInteractive = (f) => f.rules.length > 0 || !!f.game;
+export const usesTaps = (f, script = "") =>
+  f.rules.some((r) => r.trigger === "Tap") || (f.game?.type === "nails" && f.game.fire === "Tap") || /function\s+tap\s*\(/.test(script);
+export const isInteractive = (f) => f.rules.length > 0 || !!f.game || !!f.script;
 export const needsFaces = (f) => f.stickers.length > 0 || f.warps.length > 0 || isInteractive(f);
 export const needsMask = (f) => f.background !== "None";
 

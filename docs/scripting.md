@@ -1,0 +1,96 @@
+# Lensmith Script
+
+A filter can carry a `script.js` — plain JavaScript that runs every frame on top of the camera.
+That's how mini-games like **Nail It** are made: no app update needed, just write the script in
+the Studio's **Script** tab, test it in the preview and publish the filter.
+
+```json
+{ "name": "Nail It", "script": "script.js", "minAppVersion": 5, "doubleTapFlip": false }
+```
+
+## The three functions
+
+Define any of these; Lensmith calls them by name.
+
+| Function | When |
+|---|---|
+| `start(lens)` | Once, before the first frame |
+| `update(lens, dt)` | Every frame. `dt` = seconds since the last frame. Draw everything here |
+| `tap(lens, x, y)` | The screen was tapped at (`x`, `y`). Defining it turns off double-tap-to-flip |
+
+Variables at the top of the file keep their values between frames — that's your game state.
+Drawing is immediate: whatever `update` draws is shown for that frame only.
+
+## Coordinates
+
+Everything is in **screen widths**, with **y going up**:
+
+- `x` runs from `0` (left edge) to `1` (right edge) — always as the user sees it, even on the
+  mirrored selfie camera.
+- `y` runs from `0` (bottom) to `lens.screen.top` (about 2 on a tall phone).
+- Angles are in **degrees**, counter-clockwise; `0` = pointing right, `90` = up.
+
+`lens.screen` is `{ left: 0, right: 1, bottom: 0, top, width: 1, height }`. Use it instead of
+hard-coded numbers so the game fits every phone.
+
+## The `lens` object
+
+| Member | |
+|---|---|
+| `lens.screen` | The visible area, see above |
+| `lens.time` | Seconds since the filter started |
+| `lens.face` | `null`, or `{ x, y, width, tilt, mouthOpen, smiling, eyesClosed, anchors }`. `x`/`y` is the nose tip; `width` is the face width; `tilt` in degrees; `mouthOpen` 0..1; `smiling`/`eyesClosed` true/false; `anchors.LeftEye` etc. are `{ x, y }` |
+| `lens.sprite(art, x, y, width, angle, alpha)` | Draws a picture centred at (x, y). `width` in screen widths (default 0.1), `angle` in degrees, `alpha` 0..1 |
+| `lens.text(text, x, y, height, alpha)` | White bold text centred at (x, y) |
+| `lens.burst(art, x, y, count, style, size)` | Particle burst. `style`: `Explode`, `Fountain`, `Rain`, `Stream` |
+| `lens.popup(text)` | A message that fades in and out |
+| `lens.flash(r, g, b)` | Flashes the screen a colour (0..1 each) |
+| `lens.random(min, max)` | A random number |
+| `lens.log(...)` | Prints to the Studio console (and the phone's log) |
+| `lens.anchors` | Names of the face anchors: `Forehead`, `BetweenEyes`, `LeftEye`, `RightEye`, `NoseTip`, `Mouth`, `Chin`, `LeftCheek`, `RightCheek` |
+
+### Art
+
+`art` is one of:
+
+- an emoji: `"⭐"`
+- a built-in drawing: `"drawing:Nail"`, `"drawing:WoodPlank"`, `"drawing:Pistol"`, `"drawing:Bullet"`,
+  `"drawing:Crown"`, `"drawing:DogNose"`, … (see the Art picker in the Studio)
+- your own picture: `"assets/gun.png"` — add it in the Studio's Assets panel. Write the path
+  as a plain string so the Studio and the store can see that it's used.
+
+## Example
+
+```js
+var stars = [], score = 0;
+
+function tap(lens, x, y) {
+  stars.push({ x: x, y: lens.screen.top });
+}
+
+function update(lens, dt) {
+  for (var i = stars.length - 1; i >= 0; i--) {
+    var s = stars[i];
+    s.y -= 0.5 * dt;
+    var f = lens.face;
+    if (f && Math.abs(s.x - f.x) < f.width * 0.3 && Math.abs(s.y - f.y) < f.width * 0.3) {
+      score++; lens.burst("✨", s.x, s.y, 8); stars.splice(i, 1);
+    } else if (s.y < 0) stars.splice(i, 1);
+    else lens.sprite("⭐", s.x, s.y, 0.08, lens.time * 90);
+  }
+  lens.text("⭐ " + score, 0.5, lens.screen.top - 0.15, 0.08);
+}
+```
+
+The Studio's Script tab has this starter and the full **Nail It** game as templates.
+
+## Rules and limits
+
+- Write **ES5-style** JavaScript (`var`, `function`) for the widest support. `let`, `const` and
+  arrow functions work, but avoid newer features such as `async`, classes with fields, or
+  optional chaining — the phone runs scripts with Rhino, not a browser engine.
+- No network, files, timers or DOM — only `Math`, `JSON`, arrays, strings and the `lens` object.
+- Each call has an instruction budget. An endless loop stops the script (the filter keeps
+  showing, the game just freezes) and the error appears in the Studio.
+- `script.js` must be 256 KB or less.
+- An error stops the script; the Studio shows the message and line number.

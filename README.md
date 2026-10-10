@@ -26,6 +26,7 @@ No install, no account. Everything runs in your browser; nothing is uploaded.
 |---|---|
 | [web/](web/) | The Studio web app (plain HTML/JS, no build step) |
 | [docs/filter-format.md](docs/filter-format.md) | The `.lensmith` package and `filter.json` format |
+| [docs/scripting.md](docs/scripting.md) | Writing mini-games and effects in JavaScript (`script.js`) |
 | [schema/filter.schema.json](schema/filter.schema.json) | JSON Schema for `filter.json` |
 | [tools/lensmith_cli.py](tools/lensmith_cli.py) | Command line: check, pack and unpack filters |
 

@@ -11,6 +11,7 @@ import { openFile, saveLensmith, buildSubmission, download } from "./pkg.js";
 const VIEW_ASPECT = 3 / 4; // width / height, like the phone's camera view
 const MAX_VIEW_HEIGHT = 960;
 const DRAFT_KEY = "lensmith-studio-draft";
+const SCRIPT_KEY = "lensmith-studio-script";
 
 const $ = (id) => document.getElementById(id);
 const glCanvas = $("gl");
@@ -29,6 +30,7 @@ const state = {
   bgPhoto: null,
   codeArea: null,
   publish: { github: "", slug: "", description: "", tags: "", version: 1, thumbnailUrl: "", thumbnail: null },
+  script: loadScript(),
 };
 
 let renderer = null;
@@ -84,7 +86,7 @@ const app = {
     return state.publish.thumbnailUrl;
   },
   async save() {
-    download(await saveLensmith(state.filter, state.assets), `${M.slugify(state.filter.name)}.lensmith`);
+    download(await saveLensmith(state.filter, state.assets, state.script), `${M.slugify(state.filter.name)}.lensmith`);
     toast("Saved — open it on your phone to add it to Lensmith");
   },
   async submit() {
@@ -97,7 +99,7 @@ const app = {
       description: p.description.trim().slice(0, 200),
       tags: p.tags.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean).slice(0, 8),
     };
-    const blob = await buildSubmission({ filter: state.filter, assets: state.assets, github: p.github, slug, listing, thumbnail: p.thumbnail });
+    const blob = await buildSubmission({ filter: state.filter, assets: state.assets, github: p.github, slug, listing, thumbnail: p.thumbnail, script: state.script });
     download(blob, `${p.github}-${slug}-submission.zip`);
     toast("Submission ready — follow the steps below");
   },
@@ -111,6 +113,7 @@ $("name").addEventListener("input", (e) => { state.filter.name = e.target.value.
 $("new").addEventListener("click", () => {
   if (!confirm("Start a new filter? Unsaved changes to this one will be lost.")) return;
   state.filter = M.defaultFilter();
+  state.script = "";
   state.assets.clear();
   state.assetImages.clear();
   state.selectedSticker = state.selectedRule = -1;
@@ -122,8 +125,9 @@ $("openFile").addEventListener("change", async (e) => {
   e.target.value = "";
   if (!file) return;
   try {
-    const { filter, assets } = await openFile(file);
+    const { filter, assets, script } = await openFile(file);
     state.filter = filter;
+    state.script = script;
     state.assets = assets;
     state.assetImages = new Map(await Promise.all([...assets].map(async ([p, b]) => [p, await loadImage(URL.createObjectURL(b))])));
     state.selectedSticker = state.selectedRule = -1;
@@ -225,6 +229,7 @@ function frame() {
   // Stickers, interactions and HUD on the 2D overlay.
   ctx.clearRect(0, 0, W, H);
   drawn = [];
+  engine.setScript(state.script);
   if (M.isInteractive(f)) engine.update(f, frames.map((fr) => toUnits(fr, W, H)), H / W, true, performance.now());
   for (const fr of frames) {
     f.stickers.forEach((s, i) => {
@@ -382,8 +387,26 @@ function saveDraft() {
   try {
     // Custom pictures aren't kept between visits (they're files); everything else is.
     localStorage.setItem(DRAFT_KEY, JSON.stringify(state.filter));
+    localStorage.setItem(SCRIPT_KEY, state.script);
   } catch { /* private mode etc. */ }
 }
+
+function loadScript() {
+  try {
+    return localStorage.getItem(SCRIPT_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+// Script errors (or "running") under the Script tab's editor.
+setInterval(() => {
+  const el = document.getElementById("scriptStatus");
+  if (!el) return;
+  const error = engine.scriptError;
+  el.className = error ? "error" : state.script.trim() ? "ok" : "muted";
+  el.textContent = error ? `Script error: ${error}` : state.script.trim() ? (source ? "✓ Running in the preview" : "Turn on the preview to run it") : "";
+}, 400);
 
 function loadDraft() {
   try {

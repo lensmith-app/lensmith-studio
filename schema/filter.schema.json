@@ -29,6 +29,7 @@
     "backgroundBottom": { "$ref": "#/$defs/color" },
     "rules": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
     "game": { "$ref": "#/$defs/game" },
+    "script": { "const": "script.js" },
     "doubleTapFlip": { "type": "boolean" }
   },
   "$defs": {

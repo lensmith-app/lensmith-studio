@@ -42,7 +42,8 @@ All fields are optional except `id` and `name`. Units: positions and sizes on th
 | `background` | string | `None` | `None`, `Blur`, `ColorPop`, `Gradient`, `Galaxy`, `Image` (green screen) |
 | `backgroundTop` / `backgroundBottom` | colour | | Gradient colours |
 | `rules` | [Rule] | [] | Interactive "when … do …" rules |
-| `game` | Game | — | Catch mini-game |
+| `game` | Game | — | Built-in mini-game (Catch) |
+| `script` | string | — | `"script.js"`: a game or effect written in JavaScript — see [scripting.md](scripting.md). Needs `minAppVersion` 5 |
 | `doubleTapFlip` | bool | true | Whether double tap flips the camera (always off when a rule uses taps) |
 
 ### Art
@@ -110,7 +111,14 @@ your nose and shoots straight up. Drive every nail in.
 { "type": "nails", "nails": 10, "fire": "MouthOpen" }
 ```
 
-`nails`: 2–16. `fire`: `MouthOpen`, `Tap` or `Blink`.
+`nails`: 2–16. `fire`: `MouthOpen`, `Tap` or `Blink`. (Kept for old filters — new games should
+be scripts, like the Nail It template in the Studio.)
+
+### Script
+
+Anything the built-in pieces can't do — your own mini-game — goes in a `script.js` file next to
+`filter.json`, with `"script": "script.js"` and `"minAppVersion": 5`. The script runs on the phone
+and in the Studio preview the same way. See [scripting.md](scripting.md).
 
 ## Versioning
 

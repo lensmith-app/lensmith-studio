@@ -3,7 +3,7 @@
 import * as M from "./model.js";
 import { artCanvas } from "./art.js";
 
-export const TABS = ["Style", "Adjust", "Effects", "Face", "Interact", "Background", "Code", "Publish"];
+export const TABS = ["Style", "Adjust", "Effects", "Face", "Interact", "Script", "Background", "Code", "Publish"];
 
 /** Tiny DOM helper: h("div.class", {attrs/on*}, ...children). */
 export function h(tag, props = {}, ...children) {
@@ -33,7 +33,7 @@ export function renderPanel(app) {
   const body = document.getElementById("tab");
   const content = {
     Style: styleTab, Adjust: adjustTab, Effects: effectsTab, Face: faceTab, Interact: interactTab,
-    Background: backgroundTab, Code: codeTab, Publish: publishTab,
+    Script: scriptTab, Background: backgroundTab, Code: codeTab, Publish: publishTab,
   }[state.tab](app);
   // Optional controls are written as `cond && control`; drop the ones that are switched off.
   body.replaceChildren(...content.flat().filter((c) => c !== false && c !== null && c !== undefined));
@@ -355,6 +355,76 @@ function backgroundTab(app) {
   out.push(h("p.muted", { style: { marginTop: "12px" } }, "Background effects find you automatically and change everything behind you."));
   return out;
 }
+
+const TEMPLATES = [
+  { name: "Starter game", file: "templates/starter.js" },
+  { name: "Nail It (Shoot the Nails)", file: "templates/nail-it.js" },
+];
+
+/** Write a game or effect in JavaScript — the Lensmith Script API. */
+function scriptTab(app) {
+  const { state } = app;
+  const f = state.filter;
+  const setScript = (source) => {
+    state.script = source;
+    if (source.trim()) f.script = "script.js";
+    else delete f.script;
+    f.minAppVersion = M.requiredAppVersion(f);
+    app.changed(false);
+  };
+  const area = h("textarea.code", {
+    spellcheck: false,
+    placeholder: "// Pick a template above, or write start(lens), update(lens, dt) and tap(lens, x, y).",
+    value: state.script,
+    oninput: (e) => setScript(e.target.value),
+  });
+  return [
+    h("h3", {}, "Script"),
+    h("p.muted", {}, "Build your own games and effects in JavaScript. The preview runs it live; the phone runs the same script (Lensmith 0.5+)."),
+    h("div.row", {}, h("span.muted", {}, "Start from:"), TEMPLATES.map((t) => h("button.ghost.small-btn", {
+      onclick: async () => {
+        if (state.script.trim() && !confirm(`Replace your script with “${t.name}”?`)) return;
+        const source = await fetch(t.file).then((r) => r.text());
+        area.value = source;
+        setScript(source);
+        app.toast(`Loaded ${t.name} — tap the preview to play`);
+      },
+    }, t.name))),
+    area,
+    h("div.muted", { id: "scriptStatus" }, ""),
+    h("details", { style: { marginTop: "10px" } },
+      h("summary", { style: { cursor: "pointer", color: "var(--ember)" } }, "API reference"),
+      h("pre", { style: { whiteSpace: "pre-wrap", fontSize: "12px", color: "var(--muted)" } }, API_HELP)),
+  ];
+}
+
+const API_HELP = `Define any of these functions:
+  start(lens)            once, when the filter turns on
+  update(lens, dt)       every frame — dt is seconds since the last frame
+  tap(lens, x, y)        the screen was tapped at (x, y)
+
+Coordinates are in screen widths: x goes across, y goes UP.
+  lens.screen   { left, right, bottom, top, width, height } — the visible area
+  lens.face     null, or { x, y (nose), width, tilt, mouthOpen, smiling,
+                eyesClosed, anchors: { Forehead: {x, y}, Mouth: … } }
+  lens.time     seconds since the filter started
+
+Drawing (call every frame from update):
+  lens.sprite(art, x, y, width, angleDegrees = 0, alpha = 1)
+      art: an emoji "⭐", a drawing "drawing:Crown" (DogEarLeft, DogEarRight,
+      DogNose, Tongue, ClownNose, Blush, Crown, WoodPlank, Nail, Bullet,
+      Pistol), or one of your pictures "assets/name.png"
+  lens.text(text, x, y, height = 0.08, alpha = 1)
+
+Effects:
+  lens.burst(art, x, y, count = 10, style = "Explode", size = 0.12)
+      style: Explode, Fountain, Rain, Stream
+  lens.popup(text)        big text for a moment
+  lens.flash(r, g, b)     flash the screen (0..1)
+  lens.random(min, max)   lens.log(...)
+
+Keep to classic JavaScript (var, function, objects, arrays, Math) — the phone's
+engine doesn't support every new feature (no classes or async).`;
 
 function codeTab(app) {
   const { state } = app;

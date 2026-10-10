@@ -14,6 +14,81 @@ const VISIBLE_WIDTH = 1;
 const VISIBLE_HEIGHT = 1;
 const rand = Math.random;
 
+/**
+ * Runs a filter's script.js in the browser — the same Lensmith Script API the app runs with
+ * Rhino (ScriptRuntime.kt). See docs/scripting.md.
+ */
+export class ScriptRuntime {
+  constructor(source, host) {
+    this.host = host;
+    this.commands = [];
+    this.pending = [];
+    this.error = null;
+    this.started = false;
+    this.time = 0;
+    const lens = {
+      sprite: (art, x, y, width = 0.1, angle = 0, alpha = 1) => { this.pending.push({ kind: "sprite", art: String(art), x: +x, y: +y, width: +width, angle: +angle, alpha: +alpha }); },
+      text: (text, x, y, height = 0.08, alpha = 1) => { this.pending.push({ kind: "text", text: String(text), x: +x, y: +y, height: +height, alpha: +alpha }); },
+      burst: (art, x, y, count = 10, style = "Explode", size = 0.12) => host.burst(String(art), +x, +y, count | 0, String(style), +size),
+      popup: (text) => host.popup(String(text)),
+      flash: (r = 1, g = 1, b = 1) => host.flash(+r, +g, +b),
+      random: (lo = 0, hi = 1) => lo + Math.random() * (hi - lo),
+      log: (...args) => host.log(args.map(String).join(" ")),
+      anchors: ["Forehead", "BetweenEyes", "LeftEye", "RightEye", "NoseTip", "Mouth", "Chin", "LeftCheek", "RightCheek"],
+    };
+    this.lens = lens;
+    try {
+      // Same shape as the app: top-level code runs once; start/update/tap are looked up by name.
+      const factory = new Function("lens", `${source}
+;return { start: typeof start === "function" ? start : null,
+          update: typeof update === "function" ? update : null,
+          tap: typeof tap === "function" ? tap : null };`);
+      this.fns = factory(lens);
+    } catch (e) {
+      throw new Error(describe(e));
+    }
+  }
+
+  get handlesTaps() { return !!this.fns?.tap; }
+
+  update(dt, screen, face) {
+    if (this.error) return;
+    this.time += dt;
+    this.pending = [];
+    Object.assign(this.lens, {
+      screen: { ...screen, width: screen.right - screen.left, height: screen.top - screen.bottom },
+      time: this.time,
+      face,
+    });
+    this.call(() => {
+      if (!this.started) { this.started = true; this.fns.start?.(this.lens); }
+      this.fns.update?.(this.lens, dt);
+    });
+    this.commands = this.pending;
+  }
+
+  tap(x, y) {
+    if (!this.error) this.call(() => this.fns.tap?.(this.lens, x, y));
+  }
+
+  call(block) {
+    try { block(); } catch (e) { this.error = describe(e); this.host.log("Script error: " + this.error); }
+  }
+}
+
+function describe(e) {
+  // new Function() adds 2 lines before the script, so shift line numbers back.
+  const m = /<anonymous>:(\d+):(\d+)/.exec(e.stack || "");
+  return m ? `${e.message} (line ${Number(m[1]) - 2})` : e.message || String(e);
+}
+
+/** "drawing:Nail", "assets/gun.png" or an emoji -> art object. */
+function scriptArt(name) {
+  if (name.startsWith("drawing:")) return { drawing: name.slice(8) };
+  if (name.startsWith("assets/")) return { image: name };
+  return { emoji: name };
+}
+
 export class InteractionEngine {
   constructor() {
     this.filter = null;
@@ -26,12 +101,39 @@ export class InteractionEngine {
     this.taps.push([x, y]);
   }
 
+  /** Mirrors x across the frame when the preview is mirrored (its own inverse). */
+  toScreenX(x) {
+    return this.mirrored ? 1 - x : x;
+  }
+
+  /** The current script source (from the Script tab). A change restarts the filter. */
+  setScript(source) {
+    if (source !== this.scriptSource) {
+      this.scriptSource = source;
+      this.filter = null;
+    }
+  }
+
   isStickerVisible(i) {
     return this.visible?.[i] ?? true;
   }
 
   reset(f) {
     this.filter = f;
+    this.scriptError = null;
+    this.script = null;
+    if (f.script && this.scriptSource) {
+      try {
+        this.script = new ScriptRuntime(this.scriptSource, {
+          burst: (art, x, y, count, style, size) => this.burst({ ...scriptArt(art), count, style, size: size / 0.35 }, null, [this.toScreenX(x), y]),
+          popup: (text) => { this.popupText = text; this.popupAge = 0; },
+          flash: (r, g, b) => { this.flashColor = [r, g, b]; this.flashAlpha = 0.8; },
+          log: (msg) => console.log("[lens]", msg),
+        });
+      } catch (e) {
+        this.scriptError = e.message;
+      }
+    }
     this.visible = f.stickers.map((s) => !s.hidden);
     this.particles = [];
     this.items = [];
@@ -93,6 +195,7 @@ export class InteractionEngine {
     for (const [tx, ty] of this.taps.splice(0)) {
       const x = mirror ? 1 - tx : tx;
       fired.push(["Tap", [x, (1 - ty) * aspect]]);
+      this.script?.tap(this.toScreenX(x), (1 - ty) * aspect);
     }
     if (timeMs - this.lastEveryMs >= 2000) {
       this.lastEveryMs = timeMs;
@@ -111,6 +214,25 @@ export class InteractionEngine {
       }
     });
 
+    if (this.script) {
+      // Scripts work in what-you-see coordinates, so a mirrored preview mirrors the face too.
+      const swap = { LeftEye: "RightEye", RightEye: "LeftEye", LeftCheek: "RightCheek", RightCheek: "LeftCheek" };
+      const at = (name) => {
+        const q = face.anchors[mirror ? swap[name] ?? name : name];
+        return { x: this.toScreenX(q[0]), y: q[1] };
+      };
+      const faceInfo = face && {
+        ...at("NoseTip"), width: face.width, tilt: mirror ? -face.tiltDegrees : face.tiltDegrees,
+        mouthOpen: face.mouthOpen, smiling: face.smiling, eyesClosed: face.eyesClosed,
+        anchors: Object.fromEntries(Object.keys(face.anchors).map((n) => [n, at(n)])),
+      };
+      this.script.update(dt, { left: 0, right: 1, bottom: 0, top: aspect }, faceInfo || null);
+      if (this.script.error && !this.scriptError) {
+        this.scriptError = this.script.error;
+        this.popupText = "Script error";
+        this.popupAge = 0;
+      }
+    }
     if (f.game?.type === "nails") {
       this.updateNails(f.game, face, dt, fired.some(([t]) => t === f.game.fire));
     } else if (f.game) {
@@ -343,17 +465,24 @@ export class InteractionEngine {
     const k = width;
     const Y = (y) => (this.aspect - y) * k; // up-units -> canvas pixels
 
-    const sprite = (art, x, y, w, angle, alpha = 1) => {
+    const sprite = (art, x, y, w, angle, alpha = 1, flip = false) => {
       const a = artCanvas(art, assets);
       if (!a) return;
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.translate(x * k, Y(y));
       ctx.rotate(-angle);
+      if (flip) ctx.scale(-1, 1);
       ctx.drawImage(a.canvas, (-w * k) / 2, (-w * k * a.aspect) / 2, w * k, w * k * a.aspect);
       ctx.restore();
     };
     if (f.game?.type === "nails") this.drawNailGame(sprite);
+    for (const c of this.script?.commands ?? []) {
+      if (c.kind === "sprite") {
+        const angle = ((this.mirrored ? -c.angle : c.angle) * Math.PI) / 180;
+        sprite(scriptArt(c.art), this.toScreenX(c.x), c.y, c.width, angle, Math.min(Math.max(c.alpha, 0), 1), this.mirrored);
+      }
+    }
     for (const it of this.items) sprite(it.art, it.x, it.y, 0.16, it.angle);
     for (const p of this.particles) sprite(p.art, p.x, p.y, p.size, p.angle, Math.min(p.life / 0.35, 1));
 
@@ -367,6 +496,10 @@ export class InteractionEngine {
       ctx.drawImage(t.canvas, -w / 2, (-w * t.aspect) / 2, w, w * t.aspect);
       ctx.restore();
     };
+
+    for (const c of this.script?.commands ?? []) {
+      if (c.kind === "text") text(c.text, this.toScreenX(c.x) * k, Y(c.y), c.height * k, Math.min(Math.max(c.alpha, 0), 1));
+    }
 
     const hudY = 0.12 * k;
     if (f.game?.type === "nails") {
