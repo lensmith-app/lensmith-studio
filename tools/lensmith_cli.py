@@ -4,7 +4,8 @@
     python lensmith_cli.py pack   <folder> [out.lensmith]
     python lensmith_cli.py unpack <file.lensmith> <folder>
 
-A filter folder holds filter.json, an optional script.js and an optional assets/ folder (png, webp, jpg).
+A filter folder holds filter.json, an optional script.js and an optional assets/ folder
+(png, webp, jpg pictures; ogg, mp3, wav, m4a sounds).
 """
 
 from __future__ import annotations
@@ -18,6 +19,18 @@ from pathlib import Path
 
 FORMAT_VERSION = 2
 ALLOWED_ASSETS = {".png", ".webp", ".jpg", ".jpeg"}
+AUDIO_ASSETS = {".ogg", ".mp3", ".wav", ".m4a"}
+# Scripts using these need Lensmith 0.10 (versionCode 15).
+SENSES_RE = re.compile(r"lens\.(sound|music)\s*\(|lens\.(hands|pose)\b")
+SENSES_APP_VERSION = 15
+
+
+def is_audio(path) -> bool:
+    """A real sound file (checked by its first bytes, not just the name)."""
+    head = Path(path).read_bytes()[:12]
+    return (head.startswith(b"OggS") or head.startswith(b"ID3") or head[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2")
+            or (head.startswith(b"RIFF") and head[8:12] == b"WAVE") or head[4:8] == b"ftyp")
+
 SCRIPT_FILE = "script.js"
 THUMBNAILS = ("thumbnail.png", "thumbnail.jpg", "thumbnail.webp")
 MAX_SCRIPT_BYTES = 256 * 1024
@@ -79,8 +92,12 @@ def check(folder: Path) -> list[str]:
     if sum(p.stat().st_size for p in files) > MAX_BYTES:
         errors.append("larger than 20 MB")
     for p in (folder / "assets").glob("*") if (folder / "assets").exists() else []:
+        if p.suffix.lower() in AUDIO_ASSETS:
+            if not is_audio(p):
+                errors.append(f"assets/{p.name}: not a readable sound file")
+            continue
         if p.suffix.lower() not in ALLOWED_ASSETS:
-            errors.append(f"assets/{p.name}: only png, webp and jpg are allowed")
+            errors.append(f"assets/{p.name}: only png, webp and jpg pictures and ogg, mp3, wav and m4a sounds are allowed")
             continue
         try:
             from PIL import Image
@@ -101,6 +118,8 @@ def pack(folder: Path, out: Path) -> None:
         if any((folder / name).exists() for name in THUMBNAILS):
             # Apps before 0.7.0 refuse packages with a thumbnail; make them say "update" instead.
             manifest["minAppVersion"] = max(manifest.get("minAppVersion", 1), 7)
+        if (folder / SCRIPT_FILE).exists() and SENSES_RE.search((folder / SCRIPT_FILE).read_text(encoding="utf-8")):
+            manifest["minAppVersion"] = max(manifest.get("minAppVersion", 1), SENSES_APP_VERSION)
         z.writestr("filter.json", json.dumps(manifest, ensure_ascii=False, indent=2))
         if (folder / SCRIPT_FILE).exists():
             z.write(folder / SCRIPT_FILE, SCRIPT_FILE)
@@ -124,7 +143,7 @@ def unpack(package: Path, out: Path) -> None:
             if root not in target.parents:
                 raise ValueError(f"unsafe path in package: {info.filename}")
             ok = info.filename in ("filter.json", SCRIPT_FILE, *THUMBNAILS) or (
-                info.filename.startswith("assets/") and Path(info.filename).suffix.lower() in ALLOWED_ASSETS
+                info.filename.startswith("assets/") and Path(info.filename).suffix.lower() in ALLOWED_ASSETS | AUDIO_ASSETS
             )
             if not ok:
                 raise ValueError(f"unexpected file in package: {info.filename}")

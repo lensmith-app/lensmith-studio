@@ -82,6 +82,32 @@ something while it works. Models come from
 [lensmith-models](https://github.com/lensmith-app/lensmith-models) (AnimeGANv2, non-commercial use).
 The **Cartoon Me** template in the Studio shows the whole flow.
 
+### Sound (Lensmith 0.10+)
+
+| Member | |
+|---|---|
+| `lens.sound(name, volume, pitch)` | Plays a short sound effect. `volume` 0..1 (default 1), `pitch` 0.5..2 (default 1; also changes speed) |
+| `lens.music(name, volume)` | Loops music (default volume 0.6). Asking for the track that's already playing only changes its volume. `lens.music(null)` stops it |
+| `lens.sounds` / `lens.songs` | Names of the built-in sound effects / music loops |
+
+Built-in effects: `pop`, `chomp`, `coin`, `jump`, `boom`, `swish`, `whoosh`, `click`, `ding`,
+`buzz`, `win`, `lose`, `laser`, `bounce`, `splash`, `tick`, `kick`, `snare`, `hihat`, `sparkle`,
+`shutter`, `whip`, `powerup`. Built-in music: `arcade`, `chill`, `beat`.
+
+Your own sounds work too: add an `.ogg`, `.mp3`, `.wav` or `.m4a` file (2 MB or less) with
+**Add sound file** in the Script tab and use its path, e.g. `lens.sound("assets/meow.ogg")`. As
+with pictures, write the path as a plain string.
+
+- Music stops when someone switches filter or leaves the app, and starts again only when your
+  script asks — so call `lens.music(...)` from `start` (or when a game begins).
+- Everything played while someone records is mixed into their video's soundtrack.
+- People can turn filter sounds off in Settings; your script doesn't need to handle that.
+- In the Studio, click the preview once first: browsers only allow sound after a click.
+- Using `lens.sound` or `lens.music` makes the filter need Lensmith 0.10 (minAppVersion 15).
+
+The built-in sounds were made for Lensmith and are free to use in any filter
+([source](../tools/sound-pack/synth.py)).
+
 ### Art
 
 `art` is one of:

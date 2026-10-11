@@ -7,6 +7,7 @@ import { InteractionEngine, toUnits } from "./engine.js";
 import { artCanvas } from "./art.js";
 import { renderPanel } from "./panels.js";
 import { openFile, saveLensmith, buildSubmission, download } from "./pkg.js";
+import { SoundEngine } from "./sound.js";
 
 const VIEW_ASPECT = 3 / 4; // width / height, like the phone's camera view
 const MAX_VIEW_HEIGHT = 960;
@@ -37,6 +38,10 @@ let renderer = null;
 const tracker = new FaceTracker();
 let trackerReady = null;
 const engine = new InteractionEngine();
+engine.sounds = new SoundEngine();
+// Browsers only allow sound after the page is clicked.
+addEventListener("pointerdown", () => engine.sounds.unlock(), { capture: true });
+addEventListener("keydown", () => engine.sounds.unlock(), { capture: true });
 let source = null; // video or a canvas holding a photo
 let drawn = [];    // stickers drawn last frame, for dragging: {index, x, y, r, frame}
 let showPoints = false;
@@ -64,6 +69,17 @@ const app = {
     const path = `assets/${M.slugify(file.name.replace(/\.[^.]+$/, ""))}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
     state.assets.set(path, file);
     state.assetImages.set(path, img);
+    return path;
+  },
+  /** Adds a sound file to the filter (for lens.sound / lens.music): returns its path. */
+  async pickSound() {
+    const file = await chooseFile("audio/ogg,audio/mpeg,audio/wav,audio/mp4,.ogg,.mp3,.wav,.m4a");
+    if (!file) return null;
+    if (file.size > 3 * 1024 * 1024) { toast("Sounds must be under 3 MB"); return null; }
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!["ogg", "mp3", "wav", "m4a"].includes(ext)) { toast("Use an .ogg, .mp3, .wav or .m4a file"); return null; }
+    const path = `assets/${M.slugify(file.name.replace(/\.[^.]+$/, ""))}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+    state.assets.set(path, file);
     return path;
   },
   async choosePhoto() {
@@ -256,6 +272,7 @@ function frame() {
   ctx.clearRect(0, 0, W, H);
   drawn = [];
   engine.setScript(state.script);
+  engine.sounds.assets = state.assets;
   if (M.isInteractive(f)) engine.update(f, frames.map((fr) => toUnits(fr, W, H)), H / W, true, performance.now());
   for (const fr of frames) {
     f.stickers.forEach((s, i) => {

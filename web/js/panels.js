@@ -393,6 +393,15 @@ function scriptTab(app) {
     }, t.name))),
     area,
     h("div.muted", { id: "scriptStatus" }, ""),
+    h("div.row", {},
+      h("button.ghost.small-btn", { onclick: async () => {
+        const path = await app.pickImage();
+        if (path) { navigator.clipboard?.writeText(`"${path}"`); app.toast(`Added ${path} (copied) — use it in lens.sprite`); }
+      } }, "Add picture"),
+      h("button.ghost.small-btn", { onclick: async () => {
+        const path = await app.pickSound?.();
+        if (path) { navigator.clipboard?.writeText(`"${path}"`); app.toast(`Added ${path} (copied) — use it in lens.sound or lens.music`); }
+      } }, "Add sound file")),
     h("label.check", {},
       h("input", { type: "checkbox", checked: !!app.state.filter.immersive, onchange: (e) => {
         if (e.target.checked) app.state.filter.immersive = true; else delete app.state.filter.immersive;
@@ -429,6 +438,16 @@ Effects:
   lens.popup(text)        big text for a moment
   lens.flash(r, g, b)     flash the screen (0..1)
   lens.random(min, max)   lens.log(...)
+
+Sound (Lensmith 0.10+; click the preview once so the browser allows sound):
+  lens.sound(name, volume = 1, pitch = 1)    a short effect; pitch 0.5..2
+      built in: pop chomp coin jump boom swish whoosh click ding buzz win
+      lose laser bounce splash tick kick snare hihat sparkle shutter whip
+      powerup — or your own file "assets/name.ogg" (Add sound file)
+  lens.music(name, volume = 0.6)   loops: "arcade", "chill", "beat" or a file
+  lens.music(null)                 stops the music
+  Sounds are added to videos people record. lens.sounds / lens.songs list
+  the built-in names.
 
 AI (on the device, Lensmith 0.8+):
   lens.stylize(style, function (lens, picture, error) { … })

@@ -3,6 +3,7 @@
 
 import { artCanvas, textCanvas } from "./art.js";
 import { CONTINUOUS_TRIGGERS } from "./model.js";
+import { BUILT_IN, BUILT_IN_MUSIC, DEFAULT_MUSIC_VOLUME } from "./sound.js";
 
 const TILT_DEGREES = 18;
 const STREAM_INTERVAL_MS = 60;
@@ -39,6 +40,10 @@ export class ScriptRuntime {
       burst: (art, x, y, count = 10, style = "Explode", size = 0.12) => host.burst(String(art), +x, +y, count | 0, String(style), +size),
       popup: (text) => host.popup(String(text)),
       flash: (r = 1, g = 1, b = 1) => host.flash(+r, +g, +b),
+      sound: (name, volume = 1, pitch = 1) => host.sound(String(name), +volume, +pitch),
+      music: (name, volume = DEFAULT_MUSIC_VOLUME) => host.music(name == null ? null : String(name), +volume),
+      sounds: [...BUILT_IN],
+      songs: [...BUILT_IN_MUSIC],
       random: (lo = 0, hi = 1) => lo + Math.random() * (hi - lo),
       log: (...args) => host.log(args.map(String).join(" ")),
       anchors: ["Forehead", "BetweenEyes", "LeftEye", "RightEye", "NoseTip", "Mouth", "Chin", "LeftCheek", "RightCheek"],
@@ -160,6 +165,7 @@ export class InteractionEngine {
 
   reset(f) {
     this.filter = f;
+    this.sounds?.stopAll();
     this.scriptError = null;
     this.script = null;
     this.styled = new Map();
@@ -172,6 +178,8 @@ export class InteractionEngine {
           flash: (r, g, b) => { this.flashColor = [r, g, b]; this.flashAlpha = 0.8; },
           log: (msg) => console.log("[lens]", msg),
           stylize: (style) => this.startStylize(style),
+          sound: (name, volume, pitch) => this.sounds?.play(name, volume, pitch),
+          music: (name, volume) => this.sounds?.playMusic(name, volume),
         });
       } catch (e) {
         this.scriptError = e.message;

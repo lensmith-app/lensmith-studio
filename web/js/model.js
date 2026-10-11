@@ -41,6 +41,7 @@ export const NAIL_GAME_APP_VERSION = 4;
 export const SCRIPT_APP_VERSION = 5;
 export const V6_APP_VERSION = 6; // Toon/VHS effects, immersive games
 export const AI_APP_VERSION = 10; // lens.stylize (on-device AI styles)
+export const SENSES_APP_VERSION = 15; // lens.sound / lens.music, lens.hands / lens.pose
 export const SCRIPT_FILE = "script.js";
 
 export const EMOJI_CHOICES = [
@@ -168,8 +169,9 @@ export function newAction(type) {
 }
 
 /** The oldest app that can show this filter. */
+export const usesSenses = (script = "") => /lens\.(sound|music)\s*\(|lens\.(hands|pose)\b/.test(script);
 export const requiredAppVersion = (f, script = "") =>
-  f.script && /stylize\s*\(/.test(script) ? AI_APP_VERSION : f.immersive || f.effect === "Toon" || f.effect === "Vhs" ? V6_APP_VERSION : f.script ? SCRIPT_APP_VERSION : f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION;
+  f.script && usesSenses(script) ? SENSES_APP_VERSION : f.script && /stylize\s*\(/.test(script) ? AI_APP_VERSION : f.immersive || f.effect === "Toon" || f.effect === "Vhs" ? V6_APP_VERSION : f.script ? SCRIPT_APP_VERSION : f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION;
 
 /** Pictures a script refers to by name, e.g. lens.sprite("assets/gun.png", ...). */
 export const scriptAssets = (source) => [...new Set((source || "").match(/assets\/[A-Za-z0-9._-]+/g) || [])];
