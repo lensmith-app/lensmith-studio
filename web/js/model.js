@@ -169,6 +169,8 @@ export function newAction(type) {
 }
 
 /** The oldest app that can show this filter. */
+export const usesHands = (script = "") => /lens\.hands\b/.test(script);
+export const usesPose = (script = "") => /lens\.pose\b/.test(script);
 export const usesSenses = (script = "") => /lens\.(sound|music)\s*\(|lens\.(hands|pose)\b/.test(script);
 export const requiredAppVersion = (f, script = "") =>
   f.script && usesSenses(script) ? SENSES_APP_VERSION : f.script && /stylize\s*\(/.test(script) ? AI_APP_VERSION : f.immersive || f.effect === "Toon" || f.effect === "Vhs" ? V6_APP_VERSION : f.script ? SCRIPT_APP_VERSION : f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION;

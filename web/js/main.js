@@ -8,6 +8,7 @@ import { artCanvas } from "./art.js";
 import { renderPanel } from "./panels.js";
 import { openFile, saveLensmith, buildSubmission, download } from "./pkg.js";
 import { SoundEngine } from "./sound.js";
+import { BodyTracker } from "./body.js";
 
 const VIEW_ASPECT = 3 / 4; // width / height, like the phone's camera view
 const MAX_VIEW_HEIGHT = 960;
@@ -36,6 +37,8 @@ const state = {
 
 let renderer = null;
 const tracker = new FaceTracker();
+const body = new BodyTracker();
+body.onStatus = (text) => { if (text) toast(text); };
 let trackerReady = null;
 const engine = new InteractionEngine();
 engine.sounds = new SoundEngine();
@@ -251,6 +254,18 @@ function frame() {
   const time = (performance.now() - start) / 1000;
   const faces = tracker.landmarker ? tracker.detect(source, M.needsFaces(f) || showPoints, M.needsMask(f)) : [];
   const frames = faces.map((face) => measureFace(face, toView));
+  // Hands and body (lens.hands / lens.pose), in the same units as toUnits() gives faces.
+  const wantHands = !!f.script && M.usesHands(state.script), wantPose = !!f.script && M.usesPose(state.script);
+  let bodyUnits = null;
+  if (wantHands || wantPose) {
+    body.prepare(wantHands, wantPose);
+    const raw = body.detect(source, wantHands, wantPose);
+    const unit = ([x, y]) => { const [vx, vy] = toView(x, y); return [vx / W, (H - vy) / W]; };
+    bodyUnits = {
+      hands: raw.hands.map((h) => ({ ...h, points: h.points.map(unit) })),
+      pose: raw.pose && { ...raw.pose, points: raw.pose.points.map(unit) },
+    };
+  }
 
   // Face warps (view uv, y up; radius in view widths).
   const warps = new Float32Array(32);
@@ -273,7 +288,7 @@ function frame() {
   drawn = [];
   engine.setScript(state.script);
   engine.sounds.assets = state.assets;
-  if (M.isInteractive(f)) engine.update(f, frames.map((fr) => toUnits(fr, W, H)), H / W, true, performance.now());
+  if (M.isInteractive(f)) engine.update(f, frames.map((fr) => toUnits(fr, W, H)), H / W, true, performance.now(), bodyUnits);
   for (const fr of frames) {
     f.stickers.forEach((s, i) => {
       if (!fr.matches(s.showWhen)) return;

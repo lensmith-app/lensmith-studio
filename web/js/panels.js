@@ -360,6 +360,7 @@ const TEMPLATES = [
   { name: "Starter game", file: "templates/starter.js" },
   { name: "Nail It (Shoot the Nails)", file: "templates/nail-it.js" },
   { name: "Cartoon Me (AI)", file: "templates/cartoon-me.js" },
+  { name: "Hands", file: "templates/hands.js" },
 ];
 
 /** Write a game or effect in JavaScript — the Lensmith Script API. */
@@ -448,6 +449,16 @@ Sound (Lensmith 0.10+; click the preview once so the browser allows sound):
   lens.music(null)                 stops the music
   Sounds are added to videos people record. lens.sounds / lens.songs list
   the built-in names.
+
+Hands and body (Lensmith 0.10+; the models download the first time):
+  lens.hands   [] or up to 2 hands: { x, y (palm), size, side: "left"/"right",
+               gesture: "open" "fist" "point" "thumbsUp" "thumbsDown" "peace"
+               "loveYou" "none", pinch (thumb + index touching), tip (index
+               fingertip {x, y}), thumb, points: 21 × {x, y} }
+  lens.pose    null or { nose, leftShoulder, rightShoulder, leftElbow,
+               rightElbow, leftWrist, rightWrist, leftHip, rightHip, leftKnee,
+               rightKnee, leftAnkle, rightAnkle, … } — each { x, y, visible }
+  Left/right are the person's own. Positions are where you see them on screen.
 
 AI (on the device, Lensmith 0.8+):
   lens.stylize(style, function (lens, picture, error) { … })

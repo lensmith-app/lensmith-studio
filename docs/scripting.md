@@ -108,6 +108,38 @@ with pictures, write the path as a plain string.
 The built-in sounds were made for Lensmith and are free to use in any filter
 ([source](../tools/sound-pack/synth.py)).
 
+### Hands and body (Lensmith 0.10+)
+
+| Member | |
+|---|---|
+| `lens.hands` | An array of up to 2 hands (empty when none are seen) |
+| `lens.pose` | `null`, or the person's body points |
+
+Each hand is `{ x, y, size, side, gesture, pinch, tip, thumb, points }`:
+
+- `x`, `y` — the middle of the palm; `size` — about the hand's length, in screen widths
+- `side` — `"left"` or `"right"`: the person's own hand
+- `gesture` — `"open"`, `"fist"`, `"point"`, `"thumbsUp"`, `"thumbsDown"`, `"peace"`, `"loveYou"` or `"none"`
+- `pinch` — `true` while the thumb and index fingertip touch
+- `tip` / `thumb` — the index fingertip / thumb tip, `{ x, y }`
+- `points` — all 21 points `{ x, y }` in MediaPipe's order (0 wrist, 4 thumb tip, 8 index tip,
+  12 middle tip, 16 ring tip, 20 little finger tip)
+
+`lens.pose` has a `{ x, y, visible }` point for each of: `nose`, `leftEye`, `rightEye`, `leftEar`,
+`rightEar`, `mouthLeft`, `mouthRight`, `leftShoulder`, `rightShoulder`, `leftElbow`, `rightElbow`,
+`leftWrist`, `rightWrist`, `leftPinky`, `rightPinky`, `leftIndex`, `rightIndex`, `leftThumb`,
+`rightThumb`, `leftHip`, `rightHip`, `leftKnee`, `rightKnee`, `leftAnkle`, `rightAnkle`,
+`leftHeel`, `rightHeel`, `leftFootIndex`, `rightFootIndex` (plus `leftEyeInner` etc.). `visible`
+is false when that part is off screen or hidden; check it before you rely on a point.
+
+- Positions are where you see them on screen, like `lens.face`. Left and right are the person's own.
+- The models (about 8 MB for hands, 6 MB for the body) download the first time a filter uses them.
+  Only filters that mention `lens.hands` / `lens.pose` turn tracking on.
+- Hands and body tracking cost battery. Body tracking needs the person to step back until their
+  arms fit on screen, so it works best for games where the phone is propped up.
+- Using either makes the filter need Lensmith 0.10 (minAppVersion 15). The **Hands** template in
+  the Studio is a good start.
+
 ### Art
 
 `art` is one of:

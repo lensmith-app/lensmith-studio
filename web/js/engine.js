@@ -4,6 +4,7 @@
 import { artCanvas, textCanvas } from "./art.js";
 import { CONTINUOUS_TRIGGERS } from "./model.js";
 import { BUILT_IN, BUILT_IN_MUSIC, DEFAULT_MUSIC_VOLUME } from "./sound.js";
+import { scriptBody } from "./body.js";
 
 const TILT_DEGREES = 18;
 const STREAM_INTERVAL_MS = 60;
@@ -66,7 +67,7 @@ export class ScriptRuntime {
   /** A finished lens.stylize(): art to draw, or null and an error message. */
   deliverStylized(id, art, err) { this.stylizeResults.push([id, art, err]); }
 
-  update(dt, screen, face) {
+  update(dt, screen, face, body = null) {
     if (this.error) return;
     this.time += dt;
     this.pending = [];
@@ -74,6 +75,7 @@ export class ScriptRuntime {
       screen: { ...screen, width: screen.right - screen.left, height: screen.top - screen.bottom },
       time: this.time,
       face,
+      ...scriptBody(body),
     });
     this.call(() => {
       if (!this.started) { this.started = true; this.fns.start?.(this.lens); }
@@ -214,7 +216,7 @@ export class InteractionEngine {
    * @param faces faces from measureFace(), converted with toUnits()
    * @param mirror the preview is shown mirrored (selfie)
    */
-  update(f, faces, aspect, mirror, timeMs) {
+  update(f, faces, aspect, mirror, timeMs, body = null) {
     if (f !== this.filter) this.reset(f);
     this.faces = faces;
     this.aspect = aspect;
@@ -278,7 +280,13 @@ export class InteractionEngine {
         mouthOpen: face.mouthOpen, smiling: face.smiling, eyesClosed: face.eyesClosed,
         anchors: Object.fromEntries(Object.keys(face.anchors).map((n) => [n, at(n)])),
       };
-      this.script.update(dt, { left: 0, right: 1, bottom: 0, top: aspect }, faceInfo || null);
+      // Hands and body as you see them too.
+      const flip = ([x, y]) => [this.toScreenX(x), y];
+      const bodyInfo = body && {
+        hands: body.hands.map((h) => ({ ...h, points: h.points.map(flip) })),
+        pose: body.pose && { ...body.pose, points: body.pose.points.map(flip) },
+      };
+      this.script.update(dt, { left: 0, right: 1, bottom: 0, top: aspect }, faceInfo || null, bodyInfo);
       if (this.script.error && !this.scriptError) {
         this.scriptError = this.script.error;
         this.popupText = "Script error";
