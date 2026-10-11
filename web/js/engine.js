@@ -26,7 +26,14 @@ export class ScriptRuntime {
     this.error = null;
     this.started = false;
     this.time = 0;
+    this.stylizeCallbacks = new Map();
+    this.stylizeResults = [];
     const lens = {
+      stylize: (style = "face-paint", done) => {
+        const id = host.stylize(String(style));
+        if (id >= 0 && typeof done === "function") this.stylizeCallbacks.set(id, done);
+        return id >= 0;
+      },
       sprite: (art, x, y, width = 0.1, angle = 0, alpha = 1) => { this.pending.push({ kind: "sprite", art: String(art), x: +x, y: +y, width: +width, angle: +angle, alpha: +alpha }); },
       text: (text, x, y, height = 0.08, alpha = 1) => { this.pending.push({ kind: "text", text: String(text), x: +x, y: +y, height: +height, alpha: +alpha }); },
       burst: (art, x, y, count = 10, style = "Explode", size = 0.12) => host.burst(String(art), +x, +y, count | 0, String(style), +size),
@@ -51,6 +58,9 @@ export class ScriptRuntime {
 
   get handlesTaps() { return !!this.fns?.tap; }
 
+  /** A finished lens.stylize(): art to draw, or null and an error message. */
+  deliverStylized(id, art, err) { this.stylizeResults.push([id, art, err]); }
+
   update(dt, screen, face) {
     if (this.error) return;
     this.time += dt;
@@ -62,6 +72,11 @@ export class ScriptRuntime {
     });
     this.call(() => {
       if (!this.started) { this.started = true; this.fns.start?.(this.lens); }
+      for (const [id, art, err] of this.stylizeResults.splice(0)) {
+        const done = this.stylizeCallbacks.get(id);
+        this.stylizeCallbacks.delete(id);
+        done?.(this.lens, art, err);
+      }
       this.fns.update?.(this.lens, dt);
     });
     this.commands = this.pending;
@@ -114,6 +129,27 @@ export class InteractionEngine {
     }
   }
 
+  /** Styles the current camera picture (set captureView from the page) with a style model. */
+  startStylize(style) {
+    if (this.stylizeBusy || !this.captureView) return -1;
+    const view = this.captureView();
+    if (!view) return -1;
+    this.stylizeBusy = true;
+    const id = (this.stylizeCounter = (this.stylizeCounter ?? 0) + 1);
+    const script = this.script;
+    const status = (text) => { this.popupText = text; this.popupAge = 0; };
+    import("./ai.js")
+      .then((ai) => ai.stylize(style, view, status))
+      .then((canvas) => {
+        const name = "styled:" + id;
+        (this.styled ??= new Map()).set(name, canvas);
+        if (this.popupText === "Cartoonizing…" || this.popupText === "Downloading style…") this.popupText = null;
+        script?.deliverStylized(id, name, null);
+      }, (e) => script?.deliverStylized(id, null, e.message || "Couldn't apply the style"))
+      .finally(() => { this.stylizeBusy = false; });
+    return id;
+  }
+
   isStickerVisible(i) {
     return this.visible?.[i] ?? true;
   }
@@ -122,6 +158,8 @@ export class InteractionEngine {
     this.filter = f;
     this.scriptError = null;
     this.script = null;
+    this.styled = new Map();
+    this.stylizeBusy = false;
     if (f.script && this.scriptSource) {
       try {
         this.script = new ScriptRuntime(this.scriptSource, {
@@ -129,6 +167,7 @@ export class InteractionEngine {
           popup: (text) => { this.popupText = text; this.popupAge = 0; },
           flash: (r, g, b) => { this.flashColor = [r, g, b]; this.flashAlpha = 0.8; },
           log: (msg) => console.log("[lens]", msg),
+          stylize: (style) => this.startStylize(style),
         });
       } catch (e) {
         this.scriptError = e.message;
@@ -466,7 +505,7 @@ export class InteractionEngine {
     const Y = (y) => (this.aspect - y) * k; // up-units -> canvas pixels
 
     const sprite = (art, x, y, w, angle, alpha = 1, flip = false) => {
-      const a = artCanvas(art, assets);
+      const a = art.canvas ? { canvas: art.canvas, aspect: art.canvas.height / art.canvas.width } : artCanvas(art, assets);
       if (!a) return;
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -480,7 +519,11 @@ export class InteractionEngine {
     for (const c of this.script?.commands ?? []) {
       if (c.kind === "sprite") {
         const angle = ((this.mirrored ? -c.angle : c.angle) * Math.PI) / 180;
-        sprite(scriptArt(c.art), this.toScreenX(c.x), c.y, c.width, angle, Math.min(Math.max(c.alpha, 0), 1), this.mirrored);
+        // Styled camera pictures are part of the frame, so they mirror with it.
+        const styled = c.art.startsWith("styled:");
+        const art = styled ? { canvas: this.styled?.get(c.art) } : scriptArt(c.art);
+        if (styled && !art.canvas) continue;
+        sprite(art, this.toScreenX(c.x), c.y, c.width, angle, Math.min(Math.max(c.alpha, 0), 1), this.mirrored && !styled);
       }
     }
     for (const it of this.items) sprite(it.art, it.x, it.y, 0.16, it.angle);

@@ -359,6 +359,7 @@ function backgroundTab(app) {
 const TEMPLATES = [
   { name: "Starter game", file: "templates/starter.js" },
   { name: "Nail It (Shoot the Nails)", file: "templates/nail-it.js" },
+  { name: "Cartoon Me (AI)", file: "templates/cartoon-me.js" },
 ];
 
 /** Write a game or effect in JavaScript — the Lensmith Script API. */
@@ -369,7 +370,7 @@ function scriptTab(app) {
     state.script = source;
     if (source.trim()) f.script = "script.js";
     else delete f.script;
-    f.minAppVersion = M.requiredAppVersion(f);
+    f.minAppVersion = M.requiredAppVersion(f, source);
     app.changed(false);
   };
   const area = h("textarea.code", {
@@ -428,6 +429,12 @@ Effects:
   lens.popup(text)        big text for a moment
   lens.flash(r, g, b)     flash the screen (0..1)
   lens.random(min, max)   lens.log(...)
+
+AI (on the device, Lensmith 0.8+):
+  lens.stylize(style, function (lens, picture, error) { … })
+      turns the camera picture into a cartoon in the background (a few
+      seconds). style: "face-paint", "paprika", "celeba". Draw the result
+      full screen: lens.sprite(picture, 0.5, lens.screen.top / 2, 1)
 
 Keep to classic JavaScript (var, function, objects, arrays, Math) — the phone's
 engine doesn't support every new feature (no classes or async).`;

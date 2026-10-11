@@ -221,6 +221,14 @@ function frame() {
   const W = Math.round(H * VIEW_ASPECT);
   for (const c of [glCanvas, overlay]) if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
   const crop = { texMatrix: affine(sx, 0, 0, sy, 0.5 - 0.5 * sx, 0.5 - 0.5 * sy) };
+  // lens.stylize(): the view (without the filter) at about the phone's resolution.
+  engine.captureView = () => {
+    const c = document.createElement("canvas");
+    c.width = 480;
+    c.height = 640;
+    c.getContext("2d").drawImage(source, sw * (0.5 - sx / 2), sh * (0.5 - sy / 2), sw * sx, sh * sy, 0, 0, 480, 640);
+    return c;
+  };
   const toView = (x, y) => [(0.5 + (x - 0.5) / sx) * W, (0.5 + (y - 0.5) / sy) * H];
 
   const f = state.filter;

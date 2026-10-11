@@ -57,6 +57,25 @@ hard-coded numbers so the game fits every phone.
 | `lens.log(...)` | Prints to the Studio console (and the phone's log) |
 | `lens.anchors` | Names of the face anchors: `Forehead`, `BetweenEyes`, `LeftEye`, `RightEye`, `NoseTip`, `Mouth`, `Chin`, `LeftCheek`, `RightCheek` |
 
+### AI styles (Lensmith 0.8+)
+
+`lens.stylize(style, done)` grabs the camera picture (the visible screen, without the filter's
+stickers) and redraws it with an on-device AI style model, in the background. When it's ready,
+`done(lens, picture, error)` is called: `picture` is art you can draw — to cover the screen exactly,
+`lens.sprite(picture, 0.5, lens.screen.top / 2, 1)`. If it failed, `picture` is null and `error`
+says why. It returns `false` if a picture is already being styled.
+
+| Style | Look |
+|---|---|
+| `face-paint` | Soft painted cartoon, made for faces |
+| `paprika` | Bright anime-film colours |
+| `celeba` | Clean anime portrait |
+
+The first use of a style downloads it (about 9 MB, once). It takes a few seconds, so show
+something while it works. Models come from
+[lensmith-models](https://github.com/lensmith-app/lensmith-models) (AnimeGANv2, non-commercial use).
+The **Cartoon Me** template in the Studio shows the whole flow.
+
 ### Art
 
 `art` is one of:

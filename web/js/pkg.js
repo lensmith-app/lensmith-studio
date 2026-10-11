@@ -40,7 +40,7 @@ const THUMBNAIL_APP_VERSION = 7;
 /** Builds a .lensmith package with only the pictures the filter uses. */
 export async function saveLensmith(filter, assets, script = "", thumbnail = null) {
   const zip = new JSZip();
-  const minAppVersion = thumbnail ? Math.max(requiredAppVersion(filter), THUMBNAIL_APP_VERSION) : requiredAppVersion(filter);
+  const minAppVersion = thumbnail ? Math.max(requiredAppVersion(filter, script), THUMBNAIL_APP_VERSION) : requiredAppVersion(filter, script);
   zip.file("filter.json", JSON.stringify({ ...filter, minAppVersion }, null, 2));
   if (thumbnail) zip.file("thumbnail.png", thumbnail);
   if (filter.script) zip.file(SCRIPT_FILE, script);
@@ -58,7 +58,7 @@ export async function saveLensmith(filter, assets, script = "", thumbnail = null
 export async function buildSubmission({ filter, assets, github, slug, listing, thumbnail, script = "" }) {
   const zip = new JSZip();
   const dir = zip.folder("filters").folder(github).folder(slug);
-  const manifest = { ...filter, id: `${github}.${slug}`, minAppVersion: requiredAppVersion(filter) };
+  const manifest = { ...filter, id: `${github}.${slug}`, minAppVersion: requiredAppVersion(filter, script) };
   dir.file("filter.json", JSON.stringify(manifest, null, 2));
   dir.file("listing.json", JSON.stringify(listing, null, 2));
   if (thumbnail) dir.file("thumbnail.png", thumbnail);
