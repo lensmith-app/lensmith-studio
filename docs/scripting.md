@@ -41,6 +41,9 @@ Everything is in **screen widths**, with **y going up**:
 `lens.screen` is `{ left: 0, right: 1, bottom: 0, top, width: 1, height }`. Use it instead of
 hard-coded numbers so the game fits every phone.
 
+On a wide screen (a tablet held sideways), scripts run in a centred stage no wider than 3:4 —
+the same shape as the Studio preview — so a game designed for phones keeps its layout.
+
 ## The `lens` object
 
 | Member | |
