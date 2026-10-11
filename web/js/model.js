@@ -40,7 +40,7 @@ export const NAIL_GAME_APP_VERSION = 4;
 /** Filters with a script need this app version (versionCode) or newer. */
 export const SCRIPT_APP_VERSION = 5;
 export const V6_APP_VERSION = 6; // Toon/VHS effects, immersive games
-export const AI_APP_VERSION = 8; // lens.stylize (on-device AI styles)
+export const AI_APP_VERSION = 10; // lens.stylize (on-device AI styles)
 export const SCRIPT_FILE = "script.js";
 
 export const EMOJI_CHOICES = [

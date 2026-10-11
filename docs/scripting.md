@@ -57,7 +57,7 @@ hard-coded numbers so the game fits every phone.
 | `lens.log(...)` | Prints to the Studio console (and the phone's log) |
 | `lens.anchors` | Names of the face anchors: `Forehead`, `BetweenEyes`, `LeftEye`, `RightEye`, `NoseTip`, `Mouth`, `Chin`, `LeftCheek`, `RightCheek` |
 
-### AI styles (Lensmith 0.8+)
+### AI styles (Lensmith 0.8+, portrait styles 0.9+)
 
 `lens.stylize(style, done)` grabs the camera picture (the visible screen, without the filter's
 stickers) and redraws it with an on-device AI style model, in the background. When it's ready,
@@ -67,6 +67,9 @@ says why. It returns `false` if a picture is already being styled.
 
 | Style | Look |
 |---|---|
+| `cartoon-3d` | Animated-movie 3D character (portrait: redraws each face) |
+| `cartoon-handdrawn` | Soft illustrated character (portrait) |
+| `cartoon-anime` | Full anime redraw (portrait) |
 | `face-paint` | Soft painted cartoon, made for faces |
 | `paprika` | Bright anime-film colours |
 | `celeba` | Clean anime portrait |

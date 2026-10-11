@@ -2,10 +2,11 @@
 // Tap the style name at the top to switch styles. Tap again to go back to the camera.
 //
 // lens.stylize(style, function (lens, picture, error) { ... }) grabs the camera picture (without
-// stickers) and styles it in the background; `picture` can be drawn with lens.sprite. Styles:
-// "face-paint", "paprika", "celeba". The first use downloads the style (about 9 MB).
+// stickers) and redraws it in the background; `picture` can be drawn with lens.sprite. The
+// portrait styles redraw each face as a cartoon character: "cartoon-3d", "cartoon-handdrawn",
+// "cartoon-anime". The first use of a style downloads it (about 12 MB).
 
-var STYLES = [["face-paint", "Face Paint"], ["paprika", "Paprika"], ["celeba", "Anime"]];
+var STYLES = [["cartoon-3d", "3D Cartoon"], ["cartoon-handdrawn", "Hand-drawn"], ["cartoon-anime", "Anime"]];
 var style = 0;
 var state = "live";     // live -> working -> showing
 var picture = null;
@@ -25,6 +26,7 @@ function tap(lens, x, y) {
     style = (style + 1) % STYLES.length;
     return;
   }
+  if (!lens.face) lens.popup("Face the camera for the full effect");
   var started = lens.stylize(STYLES[style][0], function (lens, art, error) {
     if (!art) {
       state = "live";

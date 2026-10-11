@@ -433,7 +433,7 @@ Effects:
 AI (on the device, Lensmith 0.8+):
   lens.stylize(style, function (lens, picture, error) { … })
       turns the camera picture into a cartoon in the background (a few
-      seconds). style: "face-paint", "paprika", "celeba". Draw the result
+      seconds). style: "cartoon-3d", "cartoon-handdrawn", "cartoon-anime" (portraits), "face-paint", "paprika", "celeba". Draw the result
       full screen: lens.sprite(picture, 0.5, lens.screen.top / 2, 1)
 
 Keep to classic JavaScript (var, function, objects, arrays, Math) — the phone's

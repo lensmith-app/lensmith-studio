@@ -134,12 +134,16 @@ export class InteractionEngine {
     if (this.stylizeBusy || !this.captureView) return -1;
     const view = this.captureView();
     if (!view) return -1;
+    // Face points (eyes, nose tip, mouth) in capture pixels, for portrait models. Units are y-up.
+    const k = view.width;
+    const facePoints = (this.faces ?? []).map((fc) =>
+      ["LeftEye", "RightEye", "NoseTip", "Mouth"].map((n) => [fc.anchors[n][0] * k, (this.aspect - fc.anchors[n][1]) * k]));
     this.stylizeBusy = true;
     const id = (this.stylizeCounter = (this.stylizeCounter ?? 0) + 1);
     const script = this.script;
     const status = (text) => { this.popupText = text; this.popupAge = 0; };
     import("./ai.js")
-      .then((ai) => ai.stylize(style, view, status))
+      .then((ai) => ai.stylize(style, view, facePoints, status))
       .then((canvas) => {
         const name = "styled:" + id;
         (this.styled ??= new Map()).set(name, canvas);
@@ -204,6 +208,7 @@ export class InteractionEngine {
    */
   update(f, faces, aspect, mirror, timeMs) {
     if (f !== this.filter) this.reset(f);
+    this.faces = faces;
     this.aspect = aspect;
     this.mirrored = mirror;
     const dt = this.lastMs < 0 ? 0 : Math.min(Math.max(timeMs - this.lastMs, 0), 100) / 1000;
