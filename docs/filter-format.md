@@ -121,6 +121,13 @@ Anything the built-in pieces can't do — your own mini-game — goes in a `scri
 `filter.json`, with `"script": "script.js"` and `"minAppVersion": 5`. The script runs on the phone
 and in the Studio preview the same way. See [scripting.md](scripting.md).
 
+## Thumbnail
+
+A package may carry the filter's own picture at the top level: `thumbnail.png`, `thumbnail.jpg`
+or `thumbnail.webp` (square, up to 512px). Lensmith shows it on the camera's filter carousel and in
+the store. Apps before 0.7.0 refuse packages with a thumbnail, so such packages set
+`minAppVersion` to at least 7 (the Studio, the CLI and the store build do this for you).
+
 ## Versioning
 
 Readers ignore fields they don't know, so new optional fields don't need a new

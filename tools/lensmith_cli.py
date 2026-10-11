@@ -19,6 +19,7 @@ from pathlib import Path
 FORMAT_VERSION = 2
 ALLOWED_ASSETS = {".png", ".webp", ".jpg", ".jpeg"}
 SCRIPT_FILE = "script.js"
+THUMBNAILS = ("thumbnail.png", "thumbnail.jpg", "thumbnail.webp")
 MAX_SCRIPT_BYTES = 256 * 1024
 MAX_FILES = 200
 MAX_BYTES = 20 * 1024 * 1024
@@ -96,9 +97,17 @@ def check(folder: Path) -> list[str]:
 
 def pack(folder: Path, out: Path) -> None:
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        z.write(folder / "filter.json", "filter.json")
+        manifest = json.loads((folder / "filter.json").read_text(encoding="utf-8"))
+        if any((folder / name).exists() for name in THUMBNAILS):
+            # Apps before 0.7.0 refuse packages with a thumbnail; make them say "update" instead.
+            manifest["minAppVersion"] = max(manifest.get("minAppVersion", 1), 7)
+        z.writestr("filter.json", json.dumps(manifest, ensure_ascii=False, indent=2))
         if (folder / SCRIPT_FILE).exists():
             z.write(folder / SCRIPT_FILE, SCRIPT_FILE)
+        for name in THUMBNAILS:
+            if (folder / name).exists():
+                z.write(folder / name, name)
+                break
         for p in sorted((folder / "assets").glob("*")) if (folder / "assets").exists() else []:
             if p.is_file():
                 z.write(p, f"assets/{p.name}")
@@ -114,7 +123,7 @@ def unpack(package: Path, out: Path) -> None:
             target = (out / info.filename).resolve()
             if root not in target.parents:
                 raise ValueError(f"unsafe path in package: {info.filename}")
-            ok = info.filename in ("filter.json", SCRIPT_FILE) or (
+            ok = info.filename in ("filter.json", SCRIPT_FILE, *THUMBNAILS) or (
                 info.filename.startswith("assets/") and Path(info.filename).suffix.lower() in ALLOWED_ASSETS
             )
             if not ok:

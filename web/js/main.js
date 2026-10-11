@@ -70,6 +70,17 @@ const app = {
     const file = await chooseFile("image/*");
     if (file) state.bgPhoto = await loadImage(URL.createObjectURL(file));
   },
+  /** Uses a picture from the computer as the thumbnail (centre-cropped square, 512px). */
+  async uploadThumbnail() {
+    const file = await chooseFile("image/*");
+    if (!file) return null;
+    const img = await loadImage(URL.createObjectURL(file));
+    const size = 512, side = Math.min(img.naturalWidth, img.naturalHeight);
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    c.getContext("2d").drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+    return setThumbnail(await new Promise((r) => c.toBlob(r, "image/png")));
+  },
   async takeThumbnail() {
     const size = 512;
     const c = document.createElement("canvas");
@@ -81,12 +92,10 @@ const app = {
     g.scale(-1, 1);
     g.drawImage(glCanvas, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
     g.drawImage(overlay, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
-    state.publish.thumbnail = await new Promise((r) => c.toBlob(r, "image/png"));
-    state.publish.thumbnailUrl = URL.createObjectURL(state.publish.thumbnail);
-    return state.publish.thumbnailUrl;
+    return setThumbnail(await new Promise((r) => c.toBlob(r, "image/png")));
   },
   async save() {
-    download(await saveLensmith(state.filter, state.assets, state.script), `${M.slugify(state.filter.name)}.lensmith`);
+    download(await saveLensmith(state.filter, state.assets, state.script, state.publish.thumbnail), `${M.slugify(state.filter.name)}.lensmith`);
     toast("Saved — open it on your phone to add it to Lensmith");
   },
   async submit() {
@@ -106,6 +115,13 @@ const app = {
   toast,
 };
 
+/** The filter's picture (store and the phone's filter carousel); null clears it. */
+function setThumbnail(blob) {
+  state.publish.thumbnail = blob;
+  state.publish.thumbnailUrl = blob ? URL.createObjectURL(blob) : "";
+  return state.publish.thumbnailUrl;
+}
+
 // ------------------------------------------------------------------ header
 
 $("name").value = state.filter.name;
@@ -116,6 +132,7 @@ $("new").addEventListener("click", () => {
   state.script = "";
   state.assets.clear();
   state.assetImages.clear();
+  setThumbnail(null);
   state.selectedSticker = state.selectedRule = -1;
   app.changed(true);
 });
@@ -125,7 +142,8 @@ $("openFile").addEventListener("change", async (e) => {
   e.target.value = "";
   if (!file) return;
   try {
-    const { filter, assets, script } = await openFile(file);
+    const { filter, assets, script, thumbnail } = await openFile(file);
+    setThumbnail(thumbnail);
     state.filter = filter;
     state.script = script;
     state.assets = assets;

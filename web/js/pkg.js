@@ -20,22 +20,29 @@ export async function openFile(file) {
   const assets = new Map();
   let total = 0;
   let script = "";
+  let thumbnail = null;
   for (const e of entries) {
     if (e.name === "filter.json") continue;
     if (e.name === SCRIPT_FILE) { script = await e.async("string"); continue; }
+    if (/^thumbnail\.(png|jpg|webp)$/.test(e.name)) { thumbnail = await e.async("blob"); continue; }
     if (!ALLOWED.test(e.name)) throw new Error(`Lensmith doesn't allow this file: ${e.name}`);
     const blob = await e.async("blob");
     total += blob.size;
     if (total > MAX_BYTES) throw new Error("This filter is larger than 20 MB.");
     assets.set(e.name, blob);
   }
-  return { filter: normalize(JSON.parse(await manifest.async("string"))), assets, script };
+  return { filter: normalize(JSON.parse(await manifest.async("string"))), assets, script, thumbnail };
 }
 
+/** Apps before 0.7.0 refuse packages with a thumbnail inside. */
+const THUMBNAIL_APP_VERSION = 7;
+
 /** Builds a .lensmith package with only the pictures the filter uses. */
-export async function saveLensmith(filter, assets, script = "") {
+export async function saveLensmith(filter, assets, script = "", thumbnail = null) {
   const zip = new JSZip();
-  zip.file("filter.json", JSON.stringify({ ...filter, minAppVersion: requiredAppVersion(filter) }, null, 2));
+  const minAppVersion = thumbnail ? Math.max(requiredAppVersion(filter), THUMBNAIL_APP_VERSION) : requiredAppVersion(filter);
+  zip.file("filter.json", JSON.stringify({ ...filter, minAppVersion }, null, 2));
+  if (thumbnail) zip.file("thumbnail.png", thumbnail);
   if (filter.script) zip.file(SCRIPT_FILE, script);
   for (const path of usedAssets(filter, script)) {
     const blob = assets.get(path);
