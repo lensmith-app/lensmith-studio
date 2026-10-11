@@ -20,7 +20,7 @@
     "grain": { "type": "number", "minimum": 0, "maximum": 1 },
     "colorize": { "$ref": "#/$defs/color" },
     "colorizeAmount": { "type": "number", "minimum": 0, "maximum": 1 },
-    "effect": { "enum": ["None", "Mirror", "Pixelate", "Sketch", "Thermal", "Posterize", "Invert", "RgbSplit"] },
+    "effect": { "enum": ["None", "Mirror", "Pixelate", "Sketch", "Thermal", "Posterize", "Invert", "RgbSplit", "Toon", "Vhs"] },
     "effectParam": { "type": "number" },
     "stickers": { "type": "array", "items": { "$ref": "#/$defs/sticker" } },
     "warps": { "type": "array", "items": { "$ref": "#/$defs/warp" } },
@@ -30,6 +30,7 @@
     "rules": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
     "game": { "$ref": "#/$defs/game" },
     "script": { "const": "script.js" },
+    "immersive": { "type": "boolean" },
     "doubleTapFlip": { "type": "boolean" }
   },
   "$defs": {

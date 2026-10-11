@@ -96,6 +96,43 @@ vec3 galaxy(vec2 uv) {
     return c;
 }
 
+// Toon: edge-preserving smoothing, soft cel shading and ink lines (animated-movie look).
+vec3 toon(vec2 uv) {
+    vec2 aspect = vec2(1.0, uResolution.x / uResolution.y);
+    vec3 center = cam(uv);
+    vec3 sum = center;
+    float wsum = 1.0;
+    for (int i = 0; i < 24; i++) {
+        float fi = float(i) + 0.5;
+        float a = fi * 2.39996;
+        vec3 s = cam(uv + vec2(cos(a), sin(a)) * sqrt(fi / 24.0) * 0.014 * aspect);
+        vec3 diff = s - center;
+        float w = exp(-dot(diff, diff) * 30.0);
+        sum += s * w;
+        wsum += w;
+    }
+    vec3 c = sum / wsum;
+    vec2 px = 2.0 / uResolution;
+    float gx = luma(cam(uv + vec2(px.x, 0.0))) - luma(cam(uv - vec2(px.x, 0.0)));
+    float gy = luma(cam(uv + vec2(0.0, px.y))) - luma(cam(uv - vec2(0.0, px.y)));
+    float edge = smoothstep(0.10, 0.30, length(vec2(gx, gy)));
+    float l = luma(c);
+    float q = floor(l * 6.0 + 0.5) / 6.0;
+    c *= mix(1.0, (q + 0.03) / (l + 0.03), 0.45);
+    c = mix(vec3(luma(c)), c, 1.3) * 1.06 + 0.03;
+    return mix(c, c * 0.3, edge * 0.55);
+}
+
+// VHS: wobbling lines, colour bleed and scanlines.
+vec3 vhs(vec2 uv) {
+    float p = uEffectParam;
+    float line = floor(uv.y * uResolution.y / 3.0);
+    uv.x += (rand(vec2(line, floor(uTime * 24.0))) - 0.5) * 0.004 * p + sin(uv.y * 30.0 + uTime * 2.0) * 0.0015 * p;
+    vec3 c = vec3(cam(uv + vec2(0.005 * p, 0.0)).r, cam(uv).g, cam(uv - vec2(0.005 * p, 0.0)).b);
+    c *= 0.88 + 0.12 * sin(uv.y * uResolution.y * 1.2);
+    return mix(c, vec3(luma(c)), 0.12);
+}
+
 void main() {
     vec2 uv = warp(vUv);
 
@@ -121,6 +158,10 @@ void main() {
         float gy = -tl - 2.0 * t - tr + bl + 2.0 * b + br;
         float edge = length(vec2(gx, gy));
         c = vec3(1.0 - smoothstep(0.08, 0.35, edge));
+    } else if (uEffect == 8) {        // Toon
+        c = mix(cam(uv), toon(uv), uEffectParam);
+    } else if (uEffect == 9) {        // VHS
+        c = vhs(uv);
     } else if (uEffect == 7) {        // RGB split / glitch
         float o = uEffectParam * (1.0 + 0.5 * sin(uTime * 3.0));
         c = vec3(cam(uv + vec2(o, 0.0)).r, cam(uv).g, cam(uv - vec2(o, 0.0)).b);
@@ -168,7 +209,7 @@ void main() {
 }
 `;
 
-const EFFECT_IDS = { None: 0, Mirror: 1, Pixelate: 2, Sketch: 3, Thermal: 4, Posterize: 5, Invert: 6, RgbSplit: 7 };
+const EFFECT_IDS = { None: 0, Mirror: 1, Pixelate: 2, Sketch: 3, Thermal: 4, Posterize: 5, Invert: 6, RgbSplit: 7, Toon: 8, Vhs: 9 };
 const BACKGROUND_IDS = { None: 0, Blur: 1, ColorPop: 2, Gradient: 3, Galaxy: 4, Image: 5 };
 const IDENTITY = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 

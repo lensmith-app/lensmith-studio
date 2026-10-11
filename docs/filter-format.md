@@ -36,7 +36,7 @@ All fields are optional except `id` and `name`. Units: positions and sizes on th
 | `vignette` | number | 0 | 0 … 1, darkens the corners |
 | `grain` | number | 0 | 0 … 1, film grain |
 | `colorize` / `colorizeAmount` | colour / number | white / 0 | Colour wash and its strength |
-| `effect` / `effectParam` | string / number | `None` / 0 | `None`, `Mirror`, `Pixelate`, `Sketch`, `Thermal`, `Posterize`, `Invert`, `RgbSplit` |
+| `effect` / `effectParam` | string / number | `None` / 0 | `None`, `Mirror`, `Pixelate`, `Sketch`, `Thermal`, `Posterize`, `Invert`, `RgbSplit`, `Toon` (cartoon look, param = strength 0–1), `Vhs` (retro tape, param = strength). Toon and Vhs need `minAppVersion` 6 |
 | `stickers` | [Sticker] | [] | Pictures pinned to the face |
 | `warps` | [Warp] | [] | Face reshaping |
 | `background` | string | `None` | `None`, `Blur`, `ColorPop`, `Gradient`, `Galaxy`, `Image` (green screen) |
@@ -44,6 +44,7 @@ All fields are optional except `id` and `name`. Units: positions and sizes on th
 | `rules` | [Rule] | [] | Interactive "when … do …" rules |
 | `game` | Game | — | Built-in mini-game (Catch) |
 | `script` | string | — | `"script.js"`: a game or effect written in JavaScript — see [scripting.md](scripting.md). Needs `minAppVersion` 5 |
+| `immersive` | bool | false | Full-screen game: the camera hides its filter carousel while this filter is on. Needs `minAppVersion` 6 |
 | `doubleTapFlip` | bool | true | Whether double tap flips the camera (always off when a rule uses taps) |
 
 ### Art

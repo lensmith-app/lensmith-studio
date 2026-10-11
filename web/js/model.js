@@ -13,12 +13,14 @@ export const CONDITIONS = ["Always", "MouthOpen", "MouthClosed", "Smiling", "Eye
 export const CONDITION_LABELS = {
   Always: "Always", MouthOpen: "Mouth open", MouthClosed: "Mouth closed", Smiling: "Smiling", EyesClosed: "Eyes closed",
 };
-export const EFFECTS = ["None", "Mirror", "Pixelate", "Sketch", "Thermal", "Posterize", "Invert", "RgbSplit"];
-export const EFFECT_LABELS = { None: "None", RgbSplit: "Glitch", Posterize: "Comic" };
+export const EFFECTS = ["None", "Mirror", "Pixelate", "Sketch", "Thermal", "Posterize", "Invert", "RgbSplit", "Toon", "Vhs"];
+export const EFFECT_LABELS = { None: "None", RgbSplit: "Glitch", Posterize: "Comic", Vhs: "VHS" };
 export const EFFECT_PARAMS = {
   Pixelate: { label: "Pixel count", min: 16, max: 120, step: 1, def: 48 },
   Posterize: { label: "Color levels", min: 2, max: 10, step: 1, def: 5 },
   RgbSplit: { label: "Split distance", min: 0.002, max: 0.03, step: 0.001, def: 0.012 },
+  Toon: { label: "Strength", min: 0.2, max: 1, step: 0.05, def: 1 },
+  Vhs: { label: "Strength", min: 0.3, max: 2, step: 0.05, def: 1 },
 };
 export const BACKGROUNDS = ["None", "Blur", "ColorPop", "Gradient", "Galaxy", "Image"];
 export const BACKGROUND_LABELS = { None: "Normal", ColorPop: "Color pop", Image: "Green screen" };
@@ -37,6 +39,7 @@ export const FIRE_LABELS = { MouthOpen: "Opening mouth", Tap: "Tapping", Blink: 
 export const NAIL_GAME_APP_VERSION = 4;
 /** Filters with a script need this app version (versionCode) or newer. */
 export const SCRIPT_APP_VERSION = 5;
+export const V6_APP_VERSION = 6; // Toon/VHS effects, immersive games
 export const SCRIPT_FILE = "script.js";
 
 export const EMOJI_CHOICES = [
@@ -165,7 +168,7 @@ export function newAction(type) {
 
 /** The oldest app that can show this filter. */
 export const requiredAppVersion = (f) =>
-  f.script ? SCRIPT_APP_VERSION : f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION;
+  f.immersive || f.effect === "Toon" || f.effect === "Vhs" ? V6_APP_VERSION : f.script ? SCRIPT_APP_VERSION : f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION;
 
 /** Pictures a script refers to by name, e.g. lens.sprite("assets/gun.png", ...). */
 export const scriptAssets = (source) => [...new Set((source || "").match(/assets\/[A-Za-z0-9._-]+/g) || [])];

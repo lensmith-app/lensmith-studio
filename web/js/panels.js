@@ -392,6 +392,12 @@ function scriptTab(app) {
     }, t.name))),
     area,
     h("div.muted", { id: "scriptStatus" }, ""),
+    h("label.check", {},
+      h("input", { type: "checkbox", checked: !!app.state.filter.immersive, onchange: (e) => {
+        if (e.target.checked) app.state.filter.immersive = true; else delete app.state.filter.immersive;
+        app.changed();
+      } }),
+      " Full-screen game", h("span.muted", {}, " — hides the filter carousel while playing (Lensmith 0.6+)")),
     h("details", { style: { marginTop: "10px" } },
       h("summary", { style: { cursor: "pointer", color: "var(--ember)" } }, "API reference"),
       h("pre", { style: { whiteSpace: "pre-wrap", fontSize: "12px", color: "var(--muted)" } }, API_HELP)),

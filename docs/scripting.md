@@ -21,6 +21,14 @@ Define any of these; Lensmith calls them by name.
 Variables at the top of the file keep their values between frames — that's your game state.
 Drawing is immediate: whatever `update` draws is shown for that frame only.
 
+## Full-screen games
+
+The camera's filter carousel covers the bottom of the screen. For a game, add
+`"immersive": true` to filter.json (the **Full-screen game** box in the Script tab): the carousel
+hides while the filter is on (a small **Filters** button brings it back), so the game can use
+everything above the shutter button — about the bottom 22% of the screen is still covered.
+Without it, keep the play area above ~45% of the screen height.
+
 ## Coordinates
 
 Everything is in **screen widths**, with **y going up**:

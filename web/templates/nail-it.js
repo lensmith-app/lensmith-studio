@@ -5,17 +5,17 @@
 // One shot per round — once the bullet is past the last nail you win (all nails) or lose.
 // Tap to play again.
 
-var NAILS = 10;        // nails per round (half on each wall)
+var NAILS = 12;        // nails per round (half on each wall)
 var WALL = 0.13;       // wall thickness, in screen widths
 var NAIL_LENGTH = 0.17;
 var BULLET_SPEED = 1.5; // screen widths per second
 var BULLET_SIZE = 0.012;
-var SWING_SPEED = 2.2;  // how fast the gun swings
-var AIM_LOW = 148;      // gun angle range in degrees (90 = straight up, 180 = left)
-var AIM_HIGH = 178;
-var GUN_Y = 0.47;       // gun height, as a fraction of the screen (above the camera controls)
-var NAILS_FROM = 0.56;  // nails run from here up to NAILS_TO below the top
-var NAILS_TO = 0.12;
+var SWING_SPEED = 2.0;  // how fast the gun swings
+var AIM_LOW = 135;      // gun angle range in degrees (90 = straight up, 180 = left)
+var AIM_HIGH = 195;     // the perfect shots are shallow: about 165-168° and 177-178°
+var GUN_Y = 0.27;       // gun height, as a fraction of the screen (full-screen game: carousel hidden)
+var NAILS_FROM = 0.36;  // nails run from here up to NAILS_TO below the top
+var NAILS_TO = 0.10;
 
 var nails = [];
 var bullet = null;
