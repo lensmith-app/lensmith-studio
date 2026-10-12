@@ -6,6 +6,47 @@ import * as THREE from "three";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 import { FACE_TRIANGLES, FACE_UV } from "./facemesh.js";
 
+// Face paint shading, as in the app's FaceMeshProgram: the skin under each pixel divided by the
+// face's usual brightness (measured at the cheeks, forehead and nose bridge) lights the paint.
+const SHADING = 0.85;
+const REF_POINTS = [50, 280, 151, 6];
+const PAINT_VERTEX = `
+  uniform vec2 uCrop;
+  varying vec2 vUv;
+  varying vec2 vSkin;
+  void main() {
+    vUv = uv;
+    vSkin = 0.5 + position.xy * uCrop * 0.5;
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+  }`;
+const PAINT_FRAGMENT = `
+  uniform sampler2D uTex;
+  uniform sampler2D uSkin;
+  uniform vec2 uCrop;
+  uniform vec2 uRef[4];
+  uniform float uShade;
+  uniform float uOpacity;
+  varying vec2 vUv;
+  varying vec2 vSkin;
+  float lum(vec2 p) { return dot(texture2D(uSkin, p).rgb, vec3(0.299, 0.587, 0.114)); }
+  void main() {
+    vec4 c = texture2D(uTex, vUv);
+    vec3 rgb = c.rgb;
+    if (uShade > 0.0) {
+      float usual = 0.0;
+      for (int i = 0; i < 4; i++) {
+        vec2 p = 0.5 + uRef[i] * uCrop * 0.5;
+        usual += lum(p) + lum(p + vec2(0.006, 0.0)) + lum(p - vec2(0.006, 0.0))
+          + lum(p + vec2(0.0, 0.006)) + lum(p - vec2(0.0, 0.006));
+      }
+      usual /= 20.0;
+      float light = clamp(lum(vSkin) / max(usual, 0.05), 0.3, 1.6);
+      rgb *= mix(1.0, light, uShade);
+    }
+    float a = c.a * uOpacity;
+    gl_FragColor = vec4(rgb * a, a);
+  }`;
+
 // The head, roughly (same as the app): hides whatever of a model is behind it.
 const HEAD = { y: 2.5, z: -6.5, rx: 7.8, ry: 12.5, rz: 9.5, roundness: 0.6 };
 
@@ -50,7 +91,6 @@ export class FaceModels {
       this.builtinPaint ??= new Map();
       if (!this.builtinPaint.has(key)) {
         const tex = new THREE.TextureLoader().load(`facepaint/${key.replace(/^builtin:/, "")}`);
-        tex.colorSpace = THREE.SRGBColorSpace;
         tex.flipY = false; // the mesh's uv has v pointing down, like the picture
         this.builtinPaint.set(key, tex);
       }
@@ -58,7 +98,6 @@ export class FaceModels {
     }
     if (!this.paintTextures.has(key)) {
       const tex = new THREE.Texture();
-      tex.colorSpace = THREE.SRGBColorSpace;
       tex.flipY = false; // the mesh's uv has v pointing down, like the picture
       createImageBitmap(key).then((bmp) => { tex.image = bmp; tex.needsUpdate = true; });
       this.paintTextures.set(key, tex);
@@ -66,12 +105,24 @@ export class FaceModels {
     return this.paintTextures.get(key);
   }
 
-  /** Builds the paint meshes for [paintFaces] (each: Float32Array of 468 x/y clip positions). */
-  preparePaint(paintFaces, paint, assets) {
+  /**
+   * Builds the paint meshes for [paintFaces] (each: Float32Array of 468 x/y clip positions).
+   * [source] is the camera picture and [sx]/[sy] the part of it the view shows, for shading.
+   */
+  preparePaint(paintFaces, paint, assets, source, sx, sy) {
     this.paintMeshes.forEach((m) => m.visible = false);
     if (!paint || !paintFaces.length) return false;
     const tex = this.paintTexture(paint, assets);
     const blend = paint.blend ?? "Normal";
+    if (source) {
+      if (!this.skin || this.skin.image !== source) {
+        this.skin?.dispose();
+        this.skin = new THREE.Texture(source);
+        this.skin.minFilter = this.skin.magFilter = THREE.LinearFilter;
+        this.skin.generateMipmaps = false;
+      }
+      this.skin.needsUpdate = true;
+    }
     paintFaces.forEach((pos, i) => {
       let mesh = this.paintMeshes[i];
       if (!mesh) {
@@ -79,7 +130,16 @@ export class FaceModels {
         g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(468 * 3), 3));
         g.setAttribute("uv", new THREE.BufferAttribute(Float32Array.from(FACE_UV), 2));
         g.setIndex(FACE_TRIANGLES);
-        mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, premultipliedAlpha: true }));
+        mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
+          uniforms: {
+            uTex: { value: null }, uSkin: { value: null }, uCrop: { value: new THREE.Vector2(1, 1) },
+            uRef: { value: [0, 1, 2, 3].map(() => new THREE.Vector2()) }, uShade: { value: 0 }, uOpacity: { value: 1 },
+          },
+          vertexShader: PAINT_VERTEX,
+          fragmentShader: PAINT_FRAGMENT,
+          transparent: true, depthTest: false, depthWrite: false,
+          blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+        }));
         mesh.frustumCulled = false;
         this.paintScene.add(mesh);
         this.paintMeshes.push(mesh);
@@ -87,9 +147,15 @@ export class FaceModels {
       const attr = mesh.geometry.attributes.position;
       for (let k = 0; k < 468; k++) attr.setXYZ(k, pos[k * 2], pos[k * 2 + 1], 0);
       attr.needsUpdate = true;
-      const m = mesh.material;
-      m.map = tex;
-      m.opacity = paint.opacity ?? 1;
+      const u = mesh.material.uniforms;
+      u.uTex.value = tex;
+      u.uOpacity.value = paint.opacity ?? 1;
+      // Same as the app: Normal and Screen paint take on the skin's light and texture (Multiply
+      // already keeps it). uRef: where the face's usual brightness is measured.
+      u.uShade.value = source && blend !== "Multiply" ? SHADING : 0;
+      u.uSkin.value = this.skin ?? null;
+      u.uCrop.value.set(sx ?? 1, sy ?? 1);
+      REF_POINTS.forEach((p, k) => u.uRef.value[k].set(pos[p * 2], pos[p * 2 + 1]));
       mesh.visible = true;
     });
     // Multiply / Screen happen when the paint canvas is composited (see the constructor).
@@ -132,11 +198,11 @@ export class FaceModels {
    * Draws [filter]'s models on [faces] (each with a .pose matrix). [sx]/[sy] are the fractions of
    * the source the view shows (a centred crop); [aspect] = source width / height.
    */
-  render(faces, filter, assets, W, H, sx, sy, aspect, paintFaces = []) {
+  render(faces, filter, assets, W, H, sx, sy, aspect, paintFaces = [], source = null) {
     const models = filter.models ?? [];
     if (this.canvas.width !== W || this.canvas.height !== H) this.renderer.setSize(W, H, false);
     const posed = faces.filter((f) => f.pose);
-    const painted = this.preparePaint(paintFaces, filter.facePaint, assets);
+    const painted = this.preparePaint(paintFaces, filter.facePaint, assets, source, sx, sy);
     if (this.paintCanvas.width !== W || this.paintCanvas.height !== H) Object.assign(this.paintCanvas, { width: W, height: H });
     this.paintCtx.clearRect(0, 0, W, H);
     if (painted) {

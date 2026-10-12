@@ -308,7 +308,7 @@ function frame() {
       }
       return out;
     }) : [];
-    faceModels.render(faces, f, state.assets, W, H, sx, sy, sw / sh, paintFaces);
+    faceModels.render(faces, f, state.assets, W, H, sx, sy, sw / sh, paintFaces, source);
   }
   // Hands and body (lens.hands / lens.pose), in the same units as toUnits() gives faces.
   const wantHands = !!f.script && M.usesHands(state.script), wantPose = !!f.script && M.usesPose(state.script);
