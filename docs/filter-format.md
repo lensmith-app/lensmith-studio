@@ -49,6 +49,7 @@ All fields are optional except `id` and `name`. Units: positions and sizes on th
 | `immersive` | bool | false | Full-screen game: the camera hides its filter carousel while this filter is on. Needs `minAppVersion` 6 |
 | `models` | [Model] | [] | 3D models worn on the head. Needs `minAppVersion` 16 |
 | `occludeHead` | bool | true | Hide the parts of `models` that are behind the head (the back of a hat brim) |
+| `facePaint` | FacePaint | — | A picture painted onto the face mesh (makeup, face paint). Needs `minAppVersion` 17 |
 | `doubleTapFlip` | bool | true | Whether double tap flips the camera (always off when a rule uses taps) |
 
 ### Art
@@ -145,6 +146,22 @@ Supported: meshes (triangles) with positions, normals, texture coordinates and v
 each material's base colour, base colour texture (embedded PNG or JPEG), `alphaMode` `BLEND`,
 `doubleSided` and `KHR_materials_unlit`. Not supported: animation, skinning, morph targets,
 cameras, lights, external files. Limits: 5 MB and 60,000 triangles per model.
+
+### FacePaint
+
+A picture laid over the face mesh: it bends with every blink, smile and head turn.
+
+```json
+{ "image": "assets/makeup.png", "opacity": 0.9, "blend": "Multiply" }
+```
+
+| Field | Meaning |
+|---|---|
+| `image` | A png/webp/jpg in `assets/`, painted on the **face template** (`web/face-template.png` in the Studio, "Download face template"). It uses MediaPipe's canonical face layout; the eyes and the mouth are holes and are never painted |
+| `opacity` | 0–1 |
+| `blend` | `Normal` (paint), `Multiply` (darkens like makeup, keeps the skin's texture) or `Screen` (lightens, for glow and glitter) |
+
+Transparent parts of the picture leave the skin as it is. A square picture of 1024 px is plenty.
 
 ## Thumbnail
 

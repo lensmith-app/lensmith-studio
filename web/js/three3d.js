@@ -4,6 +4,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+import { FACE_TRIANGLES, FACE_UV } from "./facemesh.js";
 
 // The head, roughly (same as the app): hides whatever of a model is behind it.
 const HEAD = { y: 2.5, z: -6.5, rx: 7.8, ry: 12.5, rz: 9.5, roundness: 0.6 };
@@ -25,6 +26,70 @@ export class FaceModels {
     this.heads = [];             // one group per face
     this.occluderMaterial = new THREE.MeshBasicMaterial({ colorWrite: false });
     this.cleared = true;
+    // Face paint: the face mesh drawn straight in clip space (positions come from the landmarks).
+    this.renderer.autoClear = false;
+    this.paintScene = new THREE.Scene();
+    this.paintCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
+    this.paintMeshes = [];
+    this.paintTextures = new WeakMap(); // Blob -> THREE.Texture
+  }
+
+  /** The face-paint picture for [paint] (a Blob in assets, or the Studio's own builtin:name.png). */
+  paintTexture(paint, assets) {
+    const blob = assets.get(paint.image);
+    const key = blob ?? paint.image;
+    if (typeof key === "string") {
+      this.builtinPaint ??= new Map();
+      if (!this.builtinPaint.has(key)) {
+        const tex = new THREE.TextureLoader().load(`facepaint/${key.replace(/^builtin:/, "")}`);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.flipY = false; // the mesh's uv has v pointing down, like the picture
+        this.builtinPaint.set(key, tex);
+      }
+      return this.builtinPaint.get(key);
+    }
+    if (!this.paintTextures.has(key)) {
+      const tex = new THREE.Texture();
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.flipY = false; // the mesh's uv has v pointing down, like the picture
+      createImageBitmap(key).then((bmp) => { tex.image = bmp; tex.needsUpdate = true; });
+      this.paintTextures.set(key, tex);
+    }
+    return this.paintTextures.get(key);
+  }
+
+  /** Builds the paint meshes for [paintFaces] (each: Float32Array of 468 x/y clip positions). */
+  preparePaint(paintFaces, paint, assets) {
+    this.paintMeshes.forEach((m) => m.visible = false);
+    if (!paint || !paintFaces.length) return false;
+    const tex = this.paintTexture(paint, assets);
+    const blend = paint.blend ?? "Normal";
+    paintFaces.forEach((pos, i) => {
+      let mesh = this.paintMeshes[i];
+      if (!mesh) {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(468 * 3), 3));
+        g.setAttribute("uv", new THREE.BufferAttribute(Float32Array.from(FACE_UV), 2));
+        g.setIndex(FACE_TRIANGLES);
+        mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, premultipliedAlpha: true }));
+        mesh.frustumCulled = false;
+        this.paintScene.add(mesh);
+        this.paintMeshes.push(mesh);
+      }
+      const attr = mesh.geometry.attributes.position;
+      for (let k = 0; k < 468; k++) attr.setXYZ(k, pos[k * 2], pos[k * 2 + 1], 0);
+      attr.needsUpdate = true;
+      const m = mesh.material;
+      m.map = tex;
+      m.opacity = paint.opacity ?? 1;
+      // Same blends as the app (FaceMeshProgram): multiply darkens like makeup, screen glows.
+      if (blend === "Multiply") Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.DstColorFactor, blendDst: THREE.OneMinusSrcAlphaFactor });
+      else if (blend === "Screen") Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcColorFactor });
+      else m.blending = THREE.NormalBlending;
+      m.needsUpdate = true;
+      mesh.visible = true;
+    });
+    return true;
   }
 
   /** Loads "assets/x.glb" from [assets] (path -> Blob). */
@@ -62,12 +127,20 @@ export class FaceModels {
    * Draws [filter]'s models on [faces] (each with a .pose matrix). [sx]/[sy] are the fractions of
    * the source the view shows (a centred crop); [aspect] = source width / height.
    */
-  render(faces, filter, assets, W, H, sx, sy, aspect) {
+  render(faces, filter, assets, W, H, sx, sy, aspect, paintFaces = []) {
     const models = filter.models ?? [];
     if (this.canvas.width !== W || this.canvas.height !== H) this.renderer.setSize(W, H, false);
     const posed = faces.filter((f) => f.pose);
-    if (!models.length || !posed.length) {
+    const painted = this.preparePaint(paintFaces, filter.facePaint, assets);
+    if ((!models.length || !posed.length) && !painted) {
       if (!this.cleared) { this.renderer.clear(); this.cleared = true; }
+      return;
+    }
+    this.renderer.clear();
+    if (painted) this.renderer.render(this.paintScene, this.paintCamera);
+    this.cleared = false;
+    if (!models.length || !posed.length) {
+      this.heads.forEach((g) => (g.visible = false));
       return;
     }
     // MediaPipe's camera for the whole source, cropped to the view.

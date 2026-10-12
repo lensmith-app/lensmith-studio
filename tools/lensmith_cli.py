@@ -29,6 +29,7 @@ MODEL_ASSETS = {".glb"}
 MAX_MODEL_BYTES = 5 * 1024 * 1024
 MAX_MODEL_TRIANGLES = 60_000
 MODELS_APP_VERSION = 16  # 3D models (.glb) on the head
+FACE_PAINT_APP_VERSION = 17  # facePaint on the face mesh
 
 
 def check_glb(path) -> list:
@@ -164,6 +165,8 @@ def pack(folder: Path, out: Path) -> None:
         if any((folder / name).exists() for name in THUMBNAILS):
             # Apps before 0.7.0 refuse packages with a thumbnail; make them say "update" instead.
             manifest["minAppVersion"] = max(manifest.get("minAppVersion", 1), 7)
+        if manifest.get("facePaint"):
+            manifest["minAppVersion"] = max(manifest.get("minAppVersion", 1), FACE_PAINT_APP_VERSION)
         if manifest.get("models"):
             manifest["minAppVersion"] = max(manifest.get("minAppVersion", 1), MODELS_APP_VERSION)
         if (folder / SCRIPT_FILE).exists() and SENSES_RE.search((folder / SCRIPT_FILE).read_text(encoding="utf-8")):

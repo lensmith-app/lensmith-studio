@@ -99,6 +99,15 @@ const app = {
     state.assets.set(path, file);
     return path;
   },
+  /** Adds one of the Studio's own face paints (web/facepaint/<name>.png). */
+  async addLibraryPaint(name) {
+    const path = `assets/${name}.png`;
+    if (!state.assets.has(path)) {
+      const blob = await fetch(`facepaint/${name}.png`, { cache: "no-cache" }).then((r) => r.blob());
+      state.assets.set(path, blob);
+    }
+    return path;
+  },
   /** Adds one of the Studio's own models (web/models/<name>.glb). */
   async addLibraryModel(name) {
     const path = `assets/${name}.glb`;
@@ -279,9 +288,19 @@ function frame() {
   const faces = tracker.landmarker ? tracker.detect(source, M.needsFaces(f) || showPoints, M.needsMask(f)) : [];
   const frames = faces.map((face) => measureFace(face, toView));
   // 3D models on the head (three.js, on its own canvas between the picture and the stickers).
-  if (f.models?.length || faceModels) {
+  if (f.models?.length || f.facePaint || faceModels) {
     faceModels ??= new FaceModels(threeCanvas);
-    faceModels.render(faces, f, state.assets, W, H, sx, sy, sw / sh);
+    // Face paint: the mesh's 468 landmarks in this view's clip space.
+    const paintFaces = f.facePaint ? faces.map((face) => {
+      const out = new Float32Array(468 * 2);
+      for (let k = 0; k < 468; k++) {
+        const [vx, vy] = toView(face.landmarks[k * 2], face.landmarks[k * 2 + 1]);
+        out[k * 2] = (vx / W) * 2 - 1;
+        out[k * 2 + 1] = 1 - (vy / H) * 2;
+      }
+      return out;
+    }) : [];
+    faceModels.render(faces, f, state.assets, W, H, sx, sy, sw / sh, paintFaces);
   }
   // Hands and body (lens.hands / lens.pose), in the same units as toUnits() gives faces.
   const wantHands = !!f.script && M.usesHands(state.script), wantPose = !!f.script && M.usesPose(state.script);

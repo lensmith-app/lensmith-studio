@@ -195,6 +195,30 @@ function faceTab(app) {
     );
   }
 
+  // ---- Face paint: a picture on the face mesh ----
+  out.push(h("h3", {}, "Face paint"),
+    h("p.muted", {}, "Makeup, face paint or tattoos that move with the face (Lensmith 0.12+). Paint on the face template — eyes and mouth are holes."),
+    h("div.row", {}, PAINT_LIBRARY.map((p) => h("button.ghost.small-btn", {
+      onclick: async () => {
+        f.facePaint = { image: await app.addLibraryPaint(p.name), opacity: p.opacity, blend: p.blend };
+        f.minAppVersion = M.requiredAppVersion(f, state.script);
+        app.changed(true);
+      },
+    }, p.label))),
+    h("div.row", {},
+      h("button.ghost.small-btn", { onclick: async () => {
+        const path = await app.pickImage();
+        if (path) { f.facePaint = { image: path, opacity: 1, blend: "Normal" }; f.minAppVersion = M.requiredAppVersion(f, state.script); app.changed(true); }
+      } }, "Upload a painted template"),
+      h("a.ghost.small-btn", { href: "face-template.png", download: "lensmith-face-template.png" }, "Download face template")));
+  if (f.facePaint) {
+    const p = f.facePaint;
+    out.push(h("div.card", {},
+      h("div.head", {}, p.image.replace(/^assets\//, ""), h("button.x", { onclick: () => { delete f.facePaint; f.minAppVersion = M.requiredAppVersion(f, state.script); app.changed(true); } }, "✕")),
+      slider("Strength", p.opacity, 0, 1, 0.01, (v) => { p.opacity = v; app.changed(); }),
+      chips(["Normal", "Multiply", "Screen"], p.blend, (b) => ({ Normal: "Paint", Multiply: "Makeup (multiply)", Screen: "Glow (screen)" })[b], (b) => { p.blend = b; app.changed(true); })));
+  }
+
   out.push(h("h3", {}, "Face shape"));
   f.warps.forEach((w, i) => out.push(h("div.card", {},
     h("div.head", {}, M.ANCHOR_LABELS[w.anchor], h("button.x", { onclick: () => { f.warps.splice(i, 1); app.changed(true); } }, "✕")),
@@ -206,6 +230,17 @@ function faceTab(app) {
     h("button.ghost.small-btn", { onclick: () => { f.warps.push({ anchor: "Mouth", radius: 0.25, strength: 0.4 }); app.changed(true); } }, "+ Shape point")));
   return out;
 }
+
+/** The Studio's own face paints (web/facepaint, made by docs/face-paint/make_paints.py). */
+const PAINT_LIBRARY = [
+  { name: "glam", label: "💄 Glam", blend: "Multiply", opacity: 0.9 },
+  { name: "freckles", label: "🌞 Freckles", blend: "Multiply", opacity: 0.8 },
+  { name: "sugar-skull", label: "💀 Sugar skull", blend: "Normal", opacity: 0.95 },
+  { name: "clown", label: "🤡 Clown", blend: "Normal", opacity: 0.95 },
+  { name: "tiger", label: "🐯 Tiger", blend: "Normal", opacity: 0.9 },
+  { name: "glitter", label: "✨ Glitter", blend: "Screen", opacity: 1 },
+  { name: "game-day", label: "🏈 Game day", blend: "Multiply", opacity: 0.95 },
+];
 
 /** The Studio's own 3D models (web/models), with a placement that suits each. */
 const MODEL_LIBRARY = [
