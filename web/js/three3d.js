@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 
 // The head, roughly (same as the app): hides whatever of a model is behind it.
-const HEAD = { y: 2.5, z: -6.5, rx: 7.8, ry: 12.5, rz: 9.5 };
+const HEAD = { y: 2.5, z: -6.5, rx: 7.8, ry: 12.5, rz: 9.5, roundness: 0.6 };
 
 export class FaceModels {
   constructor(canvas) {
@@ -79,7 +79,14 @@ export class FaceModels {
     while (this.heads.length < posed.length) {
       const g = new THREE.Group();
       g.matrixAutoUpdate = false;
-      const occluder = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), this.occluderMaterial);
+      // A "superellipsoid" (same as the app): stays wide near the top like a real head with hair.
+      const shape = new THREE.SphereGeometry(1, 20, 14);
+      const pos = shape.attributes.position;
+      for (let i = 0; i < pos.count; i++) for (let c = 0; c < 3; c++) {
+        const v = pos.getComponent(i, c);
+        pos.setComponent(i, c, Math.sign(v) * Math.pow(Math.abs(v), HEAD.roundness));
+      }
+      const occluder = new THREE.Mesh(shape, this.occluderMaterial);
       occluder.position.set(0, HEAD.y, HEAD.z);
       occluder.scale.set(HEAD.rx, HEAD.ry, HEAD.rz);
       occluder.renderOrder = -1;

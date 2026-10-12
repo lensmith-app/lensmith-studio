@@ -212,7 +212,7 @@ const MODEL_LIBRARY = [
   { name: "party-hat", label: "🎉 Party hat", position: [-3, 21, -3], rotation: [-10, 0, 12], size: 17 },
   { name: "top-hat", label: "🎩 Top hat", position: [0, 17, -4], rotation: [-8, 0, 0], size: 22 },
   { name: "crown", label: "👑 Crown", position: [0, 17, -4], rotation: [-6, 0, 0], size: 16 },
-  { name: "sunglasses", label: "🕶️ Sunglasses", position: [0, 1.5, 2.5], rotation: [0, 0, 0], size: 15 },
+  { name: "sunglasses", label: "🕶️ Sunglasses", position: [0, 1.5, 3.6], rotation: [0, 0, 0], size: 15 },
   { name: "halo", label: "😇 Halo", position: [0, 19, -4], rotation: [-15, 0, 0], size: 17 },
 ];
 
