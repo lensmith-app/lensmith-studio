@@ -51,6 +51,7 @@ the same shape as the Studio preview — so a game designed for phones keeps its
 | `lens.screen` | The visible area, see above |
 | `lens.time` | Seconds since the filter started |
 | `lens.face` | `null`, or `{ x, y, width, tilt, mouthOpen, smiling, eyesClosed, anchors }`. `x`/`y` is the nose tip; `width` is the face width; `tilt` in degrees; `mouthOpen` 0..1; `smiling`/`eyesClosed` true/false; `anchors.LeftEye` etc. are `{ x, y }` |
+| `lens.faces` | Every face in the picture (up to 3), left to right as you see them, each like `lens.face`. Lensmith 0.11+ |
 | `lens.sprite(art, x, y, width, angle, alpha)` | Draws a picture centred at (x, y). `width` in screen widths (default 0.1), `angle` in degrees, `alpha` 0..1 |
 | `lens.text(text, x, y, height, alpha)` | White bold text centred at (x, y) |
 | `lens.burst(art, x, y, count, style, size)` | Particle burst. `style`: `Explode`, `Fountain`, `Rain`, `Stream` |

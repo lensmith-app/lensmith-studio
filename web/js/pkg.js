@@ -3,7 +3,7 @@
 import JSZip from "https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm";
 import { imagePaths, normalize, requiredAppVersion, scriptAssets, SCRIPT_FILE } from "./model.js";
 
-const ALLOWED = /^assets\/[^/]+\.(png|webp|jpe?g|ogg|mp3|wav|m4a)$/i; // plus filter.json and script.js
+const ALLOWED = /^assets\/[^/]+\.(png|webp|jpe?g|ogg|mp3|wav|m4a|glb)$/i; // plus filter.json and script.js
 const MAX_FILES = 200;
 const MAX_BYTES = 20 * 1024 * 1024;
 

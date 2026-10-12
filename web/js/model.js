@@ -41,7 +41,8 @@ export const NAIL_GAME_APP_VERSION = 4;
 export const SCRIPT_APP_VERSION = 5;
 export const V6_APP_VERSION = 6; // Toon/VHS effects, immersive games
 export const AI_APP_VERSION = 10; // lens.stylize (on-device AI styles)
-export const SENSES_APP_VERSION = 15; // lens.sound / lens.music, lens.hands / lens.pose
+export const SENSES_APP_VERSION = 15;
+export const MODELS_APP_VERSION = 16; // 3D models (.glb) on the head // lens.sound / lens.music, lens.hands / lens.pose
 export const SCRIPT_FILE = "script.js";
 
 export const EMOJI_CHOICES = [
@@ -143,6 +144,8 @@ export function normalize(raw) {
   f.minAppVersion = Math.max(MIN_APP_VERSION, raw.minAppVersion ?? 0);
   f.stickers = (raw.stickers ?? []).map((s) => ({ ...defaultSticker(s), ...s, ...artOnly(s) }));
   f.warps = (raw.warps ?? []).map((w) => ({ anchor: "LeftEye", radius: 0.25, strength: 0.4, ...w }));
+  f.models = (raw.models ?? []).filter((m) => typeof m.file === "string").map((m) => ({ position: [0, 0, 0], rotation: [0, 0, 0], size: 15, ...m }));
+  if (!f.models.length) { delete f.models; delete f.occludeHead; }
   f.rules = (raw.rules ?? []).map((r) => ({ trigger: "Tap", cooldownMs: 250, ...r, actions: (r.actions ?? []).map(normalizeAction) }));
   if (raw.game?.type === "nails") {
     f.game = { type: "nails", nails: Math.min(16, Math.max(2, raw.game.nails ?? 10)), fire: raw.game.fire ?? "MouthOpen" };
@@ -173,7 +176,7 @@ export const usesHands = (script = "") => /lens\.hands\b/.test(script);
 export const usesPose = (script = "") => /lens\.pose\b/.test(script);
 export const usesSenses = (script = "") => /lens\.(sound|music)\s*\(|lens\.(hands|pose)\b/.test(script);
 export const requiredAppVersion = (f, script = "") =>
-  f.script && usesSenses(script) ? SENSES_APP_VERSION : f.script && /stylize\s*\(/.test(script) ? AI_APP_VERSION : f.immersive || f.effect === "Toon" || f.effect === "Vhs" ? V6_APP_VERSION : f.script ? SCRIPT_APP_VERSION : f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION;
+  f.models?.length || (f.script && /lens\.faces\b/.test(script)) ? MODELS_APP_VERSION : f.script && usesSenses(script) ? SENSES_APP_VERSION : f.script && /stylize\s*\(/.test(script) ? AI_APP_VERSION : f.immersive || f.effect === "Toon" || f.effect === "Vhs" ? V6_APP_VERSION : f.script ? SCRIPT_APP_VERSION : f.game?.type === "nails" ? NAIL_GAME_APP_VERSION : MIN_APP_VERSION;
 
 /** Pictures a script refers to by name, e.g. lens.sprite("assets/gun.png", ...). */
 export const scriptAssets = (source) => [...new Set((source || "").match(/assets\/[A-Za-z0-9._-]+/g) || [])];
@@ -182,7 +185,7 @@ export const scriptAssets = (source) => [...new Set((source || "").match(/assets
 export const usesTaps = (f, script = "") =>
   f.rules.some((r) => r.trigger === "Tap") || (f.game?.type === "nails" && f.game.fire === "Tap") || /function\s+tap\s*\(/.test(script);
 export const isInteractive = (f) => f.rules.length > 0 || !!f.game || !!f.script;
-export const needsFaces = (f) => f.stickers.length > 0 || f.warps.length > 0 || isInteractive(f);
+export const needsFaces = (f) => f.stickers.length > 0 || f.warps.length > 0 || (f.models?.length ?? 0) > 0 || isInteractive(f);
 export const needsMask = (f) => f.background !== "None";
 
 /** Every picture the filter uses. */

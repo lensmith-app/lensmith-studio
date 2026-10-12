@@ -67,7 +67,7 @@ export class ScriptRuntime {
   /** A finished lens.stylize(): art to draw, or null and an error message. */
   deliverStylized(id, art, err) { this.stylizeResults.push([id, art, err]); }
 
-  update(dt, screen, face, body = null) {
+  update(dt, screen, face, body = null, faces = face ? [face] : []) {
     if (this.error) return;
     this.time += dt;
     this.pending = [];
@@ -75,6 +75,7 @@ export class ScriptRuntime {
       screen: { ...screen, width: screen.right - screen.left, height: screen.top - screen.bottom },
       time: this.time,
       face,
+      faces,
       ...scriptBody(body),
     });
     this.call(() => {
@@ -271,22 +272,27 @@ export class InteractionEngine {
     if (this.script) {
       // Scripts work in what-you-see coordinates, so a mirrored preview mirrors the face too.
       const swap = { LeftEye: "RightEye", RightEye: "LeftEye", LeftCheek: "RightCheek", RightCheek: "LeftCheek" };
-      const at = (name) => {
-        const q = face.anchors[mirror ? swap[name] ?? name : name];
-        return { x: this.toScreenX(q[0]), y: q[1] };
+      const info = (fc) => {
+        const at = (name) => {
+          const q = fc.anchors[mirror ? swap[name] ?? name : name];
+          return { x: this.toScreenX(q[0]), y: q[1] };
+        };
+        return {
+          ...at("NoseTip"), width: fc.width, tilt: mirror ? -fc.tiltDegrees : fc.tiltDegrees,
+          mouthOpen: fc.mouthOpen, smiling: fc.smiling, eyesClosed: fc.eyesClosed,
+          anchors: Object.fromEntries(Object.keys(fc.anchors).map((n) => [n, at(n)])),
+        };
       };
-      const faceInfo = face && {
-        ...at("NoseTip"), width: face.width, tilt: mirror ? -face.tiltDegrees : face.tiltDegrees,
-        mouthOpen: face.mouthOpen, smiling: face.smiling, eyesClosed: face.eyesClosed,
-        anchors: Object.fromEntries(Object.keys(face.anchors).map((n) => [n, at(n)])),
-      };
+      const faceInfo = face && info(face);
+      // lens.faces: everyone, left to right as you see them (lens.face is the main one).
+      const allFaces = faces.map((fc) => (fc === face ? faceInfo : info(fc))).sort((a, b) => a.x - b.x);
       // Hands and body as you see them too.
       const flip = ([x, y]) => [this.toScreenX(x), y];
       const bodyInfo = body && {
         hands: body.hands.map((h) => ({ ...h, points: h.points.map(flip) })),
         pose: body.pose && { ...body.pose, points: body.pose.points.map(flip) },
       };
-      this.script.update(dt, { left: 0, right: 1, bottom: 0, top: aspect }, faceInfo || null, bodyInfo);
+      this.script.update(dt, { left: 0, right: 1, bottom: 0, top: aspect }, faceInfo || null, bodyInfo, allFaces);
       if (this.script.error && !this.scriptError) {
         this.scriptError = this.script.error;
         this.popupText = "Script error";

@@ -31,8 +31,9 @@ export class FaceTracker {
       this.landmarker = await FaceLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: FACE_MODEL, delegate },
         runningMode: "VIDEO",
-        numFaces: 2,
+        numFaces: 3,
         outputFaceBlendshapes: true,
+        outputFacialTransformationMatrixes: true,
       });
       this.segmenter = await ImageSegmenter.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: SEGMENT_MODEL, delegate },
@@ -63,6 +64,7 @@ export class FaceTracker {
       const now = ts / 1000;
       const previous = this.filters;
       const nextFilters = [];
+      const nextPose = new Map();
       faces = result.faceLandmarks.map((points, i) => {
         const raw = new Float32Array(points.length * 2);
         points.forEach((p, j) => { raw[j * 2] = p.x; raw[j * 2 + 1] = p.y; });
@@ -76,15 +78,25 @@ export class FaceTracker {
         const filter = match ?? new OneEuro();
         const smoothed = filter.filter(raw, now);
         nextFilters.push(filter);
+        // Head pose for 3D models, smoothed like the landmarks (translation in cm sets the speed).
+        const rawPose = result.facialTransformationMatrixes?.[i]?.data;
+        let pose = null;
+        if (rawPose && rawPose.length === 16) {
+          const pf = this.poseFilters?.get(filter) ?? new OneEuro(1.2, 0.4, 1.5, 6);
+          nextPose.set(filter, pf);
+          pose = pf.filter(Float32Array.from(rawPose), now);
+        }
         const shapes = Object.fromEntries((result.faceBlendshapes?.[i]?.categories ?? []).map((c) => [c.categoryName, c.score]));
         return {
           landmarks: smoothed,
           jawOpen: shapes.jawOpen ?? 0,
           smile: ((shapes.mouthSmileLeft ?? 0) + (shapes.mouthSmileRight ?? 0)) / 2,
           blink: ((shapes.eyeBlinkLeft ?? 0) + (shapes.eyeBlinkRight ?? 0)) / 2,
+          pose,
         };
       });
       this.filters = nextFilters;
+      this.poseFilters = nextPose;
     }
 
     if (wantMask && this.segmenter) {
@@ -104,8 +116,8 @@ export class FaceTracker {
 
 /** The "One Euro" smoother (same as the app): steady when still, quick when moving. */
 class OneEuro {
-  constructor(minCutoff = 1.2, beta = 18, dCutoff = 1.5) {
-    Object.assign(this, { minCutoff, beta, dCutoff, value: null, deriv: null, last: 0 });
+  constructor(minCutoff = 1.2, beta = 18, dCutoff = 1.5, speedIndex = 1) {
+    Object.assign(this, { minCutoff, beta, dCutoff, speedIndex, value: null, deriv: null, last: 0 });
   }
   filter(input, t) {
     if (!this.value || this.value.length !== input.length || t <= this.last) {
@@ -119,7 +131,7 @@ class OneEuro {
     const alpha = (cutoff) => 1 / (1 + 1 / (2 * Math.PI * cutoff) / dt);
     const aD = alpha(this.dCutoff);
     for (let i = 0; i < input.length; i++) this.deriv[i] += aD * ((input[i] - this.value[i]) / dt - this.deriv[i]);
-    const speed = Math.hypot(this.deriv[2], this.deriv[3]);
+    const speed = Math.hypot(this.deriv[this.speedIndex * 2], this.deriv[this.speedIndex * 2 + 1]);
     const a = alpha(this.minCutoff + this.beta * speed);
     for (let i = 0; i < input.length; i++) this.value[i] += a * (input[i] - this.value[i]);
     return Float32Array.from(this.value);

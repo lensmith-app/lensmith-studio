@@ -25,6 +25,47 @@ SENSES_RE = re.compile(r"lens\.(sound|music)\s*\(|lens\.(hands|pose)\b")
 SENSES_APP_VERSION = 15
 
 
+MODEL_ASSETS = {".glb"}
+MAX_MODEL_BYTES = 5 * 1024 * 1024
+MAX_MODEL_TRIANGLES = 60_000
+MODELS_APP_VERSION = 16  # 3D models (.glb) on the head
+
+
+def check_glb(path) -> list:
+    """Problems with a .glb 3D model (empty list = fine): format, embedded data, size."""
+    import json as _json
+    import struct as _struct
+    data = Path(path).read_bytes()
+    if len(data) < 20 or data[:4] != b"glTF" or _struct.unpack_from("<I", data, 4)[0] != 2:
+        return ["not a binary glTF 2.0 (.glb) file"]
+    length, kind = _struct.unpack_from("<II", data, 12)
+    if kind != 0x4E4F534A:
+        return ["damaged .glb file"]
+    try:
+        gltf = _json.loads(data[20:20 + length])
+    except ValueError:
+        return ["damaged .glb file"]
+    errors = []
+    for b in gltf.get("buffers", []):
+        if "uri" in b:
+            errors.append("buffers must be embedded in the .glb (no separate .bin files)")
+    for im in gltf.get("images", []):
+        if "uri" in im:
+            errors.append("textures must be embedded in the .glb")
+    triangles = 0
+    accessors = gltf.get("accessors", [])
+    for mesh in gltf.get("meshes", []):
+        for prim in mesh.get("primitives", []):
+            if prim.get("mode", 4) != 4:
+                continue
+            acc = prim.get("indices", prim.get("attributes", {}).get("POSITION"))
+            if acc is not None and acc < len(accessors):
+                triangles += accessors[acc].get("count", 0) // 3
+    if triangles > MAX_MODEL_TRIANGLES:
+        errors.append(f"{triangles} triangles (at most {MAX_MODEL_TRIANGLES})")
+    return errors
+
+
 def is_audio(path) -> bool:
     """A real sound file (checked by its first bytes, not just the name)."""
     head = Path(path).read_bytes()[:12]
@@ -92,6 +133,11 @@ def check(folder: Path) -> list[str]:
     if sum(p.stat().st_size for p in files) > MAX_BYTES:
         errors.append("larger than 20 MB")
     for p in (folder / "assets").glob("*") if (folder / "assets").exists() else []:
+        if p.suffix.lower() in MODEL_ASSETS:
+            if p.stat().st_size > MAX_MODEL_BYTES:
+                errors.append(f"assets/{p.name}: larger than 5 MB")
+            errors.extend(f"assets/{p.name}: {e}" for e in check_glb(p))
+            continue
         if p.suffix.lower() in AUDIO_ASSETS:
             if not is_audio(p):
                 errors.append(f"assets/{p.name}: not a readable sound file")
@@ -118,6 +164,8 @@ def pack(folder: Path, out: Path) -> None:
         if any((folder / name).exists() for name in THUMBNAILS):
             # Apps before 0.7.0 refuse packages with a thumbnail; make them say "update" instead.
             manifest["minAppVersion"] = max(manifest.get("minAppVersion", 1), 7)
+        if manifest.get("models"):
+            manifest["minAppVersion"] = max(manifest.get("minAppVersion", 1), MODELS_APP_VERSION)
         if (folder / SCRIPT_FILE).exists() and SENSES_RE.search((folder / SCRIPT_FILE).read_text(encoding="utf-8")):
             manifest["minAppVersion"] = max(manifest.get("minAppVersion", 1), SENSES_APP_VERSION)
         z.writestr("filter.json", json.dumps(manifest, ensure_ascii=False, indent=2))
@@ -143,7 +191,7 @@ def unpack(package: Path, out: Path) -> None:
             if root not in target.parents:
                 raise ValueError(f"unsafe path in package: {info.filename}")
             ok = info.filename in ("filter.json", SCRIPT_FILE, *THUMBNAILS) or (
-                info.filename.startswith("assets/") and Path(info.filename).suffix.lower() in ALLOWED_ASSETS | AUDIO_ASSETS
+                info.filename.startswith("assets/") and Path(info.filename).suffix.lower() in ALLOWED_ASSETS | AUDIO_ASSETS | MODEL_ASSETS
             )
             if not ok:
                 raise ValueError(f"unexpected file in package: {info.filename}")

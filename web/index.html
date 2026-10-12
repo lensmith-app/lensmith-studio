@@ -20,10 +20,14 @@
     </div>
   </header>
 
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
   <main>
     <section class="stage">
       <div id="preview" class="preview">
         <canvas id="gl"></canvas>
+        <canvas id="three"></canvas>
         <canvas id="overlay"></canvas>
         <div id="startCard" class="start-card">
           <h2>Live preview</h2>

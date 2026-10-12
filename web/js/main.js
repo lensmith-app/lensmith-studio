@@ -9,6 +9,7 @@ import { renderPanel } from "./panels.js";
 import { openFile, saveLensmith, buildSubmission, download } from "./pkg.js";
 import { SoundEngine } from "./sound.js";
 import { BodyTracker } from "./body.js";
+import { FaceModels } from "./three3d.js";
 
 const VIEW_ASPECT = 3 / 4; // width / height, like the phone's camera view
 const MAX_VIEW_HEIGHT = 960;
@@ -19,6 +20,8 @@ const $ = (id) => document.getElementById(id);
 const glCanvas = $("gl");
 const overlay = $("overlay");
 const ctx = overlay.getContext("2d");
+const threeCanvas = $("three");
+let faceModels = null; // three.js renderer, made when a filter first has 3D models
 const video = $("video");
 
 const state = {
@@ -85,6 +88,26 @@ const app = {
     state.assets.set(path, file);
     return path;
   },
+  /** Adds a .glb model file: returns its path, or null. */
+  async pickModel() {
+    const file = await chooseFile(".glb,model/gltf-binary");
+    if (!file) return null;
+    if (file.size > 5 * 1024 * 1024) { toast("3D models must be under 5 MB"); return null; }
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    if (String.fromCharCode(...head) !== "glTF") { toast("That isn't a .glb file"); return null; }
+    const path = `assets/${M.slugify(file.name.replace(/\.[^.]+$/, ""))}-${Math.random().toString(36).slice(2, 6)}.glb`;
+    state.assets.set(path, file);
+    return path;
+  },
+  /** Adds one of the Studio's own models (web/models/<name>.glb). */
+  async addLibraryModel(name) {
+    const path = `assets/${name}.glb`;
+    if (!state.assets.has(path)) {
+      const blob = await fetch(`models/${name}.glb`).then((r) => r.blob());
+      state.assets.set(path, blob);
+    }
+    return path;
+  },
   async choosePhoto() {
     const file = await chooseFile("image/*");
     if (file) state.bgPhoto = await loadImage(URL.createObjectURL(file));
@@ -110,6 +133,7 @@ const app = {
     g.translate(size, 0);
     g.scale(-1, 1);
     g.drawImage(glCanvas, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
+    if (faceModels) g.drawImage(threeCanvas, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
     g.drawImage(overlay, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
     return setThumbnail(await new Promise((r) => c.toBlob(r, "image/png")));
   },
@@ -254,6 +278,11 @@ function frame() {
   const time = (performance.now() - start) / 1000;
   const faces = tracker.landmarker ? tracker.detect(source, M.needsFaces(f) || showPoints, M.needsMask(f)) : [];
   const frames = faces.map((face) => measureFace(face, toView));
+  // 3D models on the head (three.js, on its own canvas between the picture and the stickers).
+  if (f.models?.length || faceModels) {
+    faceModels ??= new FaceModels(threeCanvas);
+    faceModels.render(faces, f, state.assets, W, H, sx, sy, sw / sh);
+  }
   // Hands and body (lens.hands / lens.pose), in the same units as toUnits() gives faces.
   const wantHands = !!f.script && M.usesHands(state.script), wantPose = !!f.script && M.usesPose(state.script);
   let bodyUnits = null;

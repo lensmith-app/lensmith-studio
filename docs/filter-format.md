@@ -9,7 +9,9 @@ A `.lensmith` file is a **zip**:
 ```
 my-filter.lensmith
 ├── filter.json        the filter (required)
-└── assets/            pictures it uses (optional): png, webp, jpg
+├── script.js          a script (optional, see scripting.md)
+└── assets/            files it uses (optional): png, webp, jpg pictures; ogg, mp3, wav, m4a
+                       sounds (minAppVersion 15); glb 3D models (minAppVersion 16)
 ```
 
 Limits: 200 files, 20 MB total. Files outside `filter.json` and `assets/` are rejected.
@@ -45,6 +47,8 @@ All fields are optional except `id` and `name`. Units: positions and sizes on th
 | `game` | Game | — | Built-in mini-game (Catch) |
 | `script` | string | — | `"script.js"`: a game or effect written in JavaScript — see [scripting.md](scripting.md). Needs `minAppVersion` 5 |
 | `immersive` | bool | false | Full-screen game: the camera hides its filter carousel while this filter is on. Needs `minAppVersion` 6 |
+| `models` | [Model] | [] | 3D models worn on the head. Needs `minAppVersion` 16 |
+| `occludeHead` | bool | true | Hide the parts of `models` that are behind the head (the back of a hat brim) |
 | `doubleTapFlip` | bool | true | Whether double tap flips the camera (always off when a rule uses taps) |
 
 ### Art
@@ -120,6 +124,27 @@ be scripts, like the Nail It template in the Studio.)
 Anything the built-in pieces can't do — your own mini-game — goes in a `script.js` file next to
 `filter.json`, with `"script": "script.js"` and `"minAppVersion": 5`. The script runs on the phone
 and in the Studio preview the same way. See [scripting.md](scripting.md).
+
+### Model
+
+A 3D model (binary glTF 2.0, `.glb`) that follows the head, turning and tilting with it:
+
+```json
+{ "file": "assets/hat.glb", "position": [0, 17, -4], "rotation": [-8, 0, 0], "size": 22 }
+```
+
+| Field | Meaning |
+|---|---|
+| `file` | The `.glb` in `assets/` |
+| `position` | Where its centre goes, in **centimetres** in MediaPipe's face space: origin at the top of the nose, x across the picture, y up, z out of the face (towards the camera). The top of the head is about y = 15 |
+| `rotation` | Degrees around x (tilt), y (turn) and z (lean), applied in that order |
+| `size` | The model is scaled so its largest side is this many centimetres |
+
+The model is centred on its bounding box. Models should face +z (glTF's front) with y up.
+Supported: meshes (triangles) with positions, normals, texture coordinates and vertex colours;
+each material's base colour, base colour texture (embedded PNG or JPEG), `alphaMode` `BLEND`,
+`doubleSided` and `KHR_materials_unlit`. Not supported: animation, skinning, morph targets,
+cameras, lights, external files. Limits: 5 MB and 60,000 triangles per model.
 
 ## Thumbnail
 

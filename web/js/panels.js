@@ -3,7 +3,7 @@
 import * as M from "./model.js";
 import { artCanvas } from "./art.js";
 
-export const TABS = ["Style", "Adjust", "Effects", "Face", "Interact", "Script", "Background", "Code", "Publish"];
+export const TABS = ["Style", "Adjust", "Effects", "Face", "3D", "Interact", "Script", "Background", "Code", "Publish"];
 
 /** Tiny DOM helper: h("div.class", {attrs/on*}, ...children). */
 export function h(tag, props = {}, ...children) {
@@ -32,7 +32,7 @@ export function renderPanel(app) {
   }, t)));
   const body = document.getElementById("tab");
   const content = {
-    Style: styleTab, Adjust: adjustTab, Effects: effectsTab, Face: faceTab, Interact: interactTab,
+    Style: styleTab, Adjust: adjustTab, Effects: effectsTab, Face: faceTab, "3D": modelsTab, Interact: interactTab,
     Script: scriptTab, Background: backgroundTab, Code: codeTab, Publish: publishTab,
   }[state.tab](app);
   // Optional controls are written as `cond && control`; drop the ones that are switched off.
@@ -204,6 +204,60 @@ function faceTab(app) {
   out.push(h("div.row", {},
     h("button.ghost.small-btn", { onclick: () => { f.warps.push({ anchor: "LeftEye", radius: 0.25, strength: 0.5 }, { anchor: "RightEye", radius: 0.25, strength: 0.5 }); app.changed(true); } }, "+ Big eyes"),
     h("button.ghost.small-btn", { onclick: () => { f.warps.push({ anchor: "Mouth", radius: 0.25, strength: 0.4 }); app.changed(true); } }, "+ Shape point")));
+  return out;
+}
+
+/** The Studio's own 3D models (web/models), with a placement that suits each. */
+const MODEL_LIBRARY = [
+  { name: "party-hat", label: "🎉 Party hat", position: [-3, 19, -3], rotation: [-10, 0, 12], size: 17 },
+  { name: "top-hat", label: "🎩 Top hat", position: [0, 17, -4], rotation: [-8, 0, 0], size: 22 },
+  { name: "crown", label: "👑 Crown", position: [0, 17, -4], rotation: [-6, 0, 0], size: 16 },
+  { name: "sunglasses", label: "🕶️ Sunglasses", position: [0, 1.5, 2.5], rotation: [0, 0, 0], size: 15 },
+  { name: "halo", label: "😇 Halo", position: [0, 19, -4], rotation: [-15, 0, 0], size: 17 },
+];
+
+function modelsTab(app) {
+  const { state } = app;
+  const f = state.filter;
+  const models = f.models ?? [];
+  const set = (list) => {
+    if (list.length) f.models = list; else { delete f.models; delete f.occludeHead; }
+    f.minAppVersion = M.requiredAppVersion(f, state.script);
+    app.changed(true);
+  };
+  const out = [
+    h("h3", {}, "3D models"),
+    h("p.muted", {}, "Real 3D hats, glasses and more that turn with your head (Lensmith 0.11+). Positions are in centimetres from the top of the nose: left/right, up/down, and forward (out of the face)."),
+    h("div.row", {}, MODEL_LIBRARY.map((m) => h("button.ghost.small-btn", {
+      onclick: async () => {
+        const file = await app.addLibraryModel(m.name);
+        set([...models, { file, position: [...m.position], rotation: [...m.rotation], size: m.size }]);
+      },
+    }, m.label))),
+    h("div.row", {}, h("button.ghost.small-btn", {
+      onclick: async () => {
+        const file = await app.pickModel?.();
+        if (file) set([...models, { file, position: [0, 0, 0], rotation: [0, 0, 0], size: 15 }]);
+      },
+    }, "Upload a .glb"), h("span.muted", {}, " binary glTF, under 5 MB and 60,000 triangles")),
+  ];
+  models.forEach((m, i) => out.push(h("div.card", {},
+    h("div.head", {}, m.file.replace(/^assets\//, ""), h("button.x", { onclick: () => set(models.filter((_, k) => k !== i)) }, "✕")),
+    slider("Size", m.size, 2, 40, 0.5, (v) => { m.size = v; app.changed(); }, (v) => `${v.toFixed(1)} cm`),
+    slider("Left / right", m.position[0], -20, 20, 0.5, (v) => { m.position[0] = v; app.changed(); }, (v) => `${v.toFixed(1)} cm`),
+    slider("Up / down", m.position[1], -20, 30, 0.5, (v) => { m.position[1] = v; app.changed(); }, (v) => `${v.toFixed(1)} cm`),
+    slider("Forward / back", m.position[2], -20, 20, 0.5, (v) => { m.position[2] = v; app.changed(); }, (v) => `${v.toFixed(1)} cm`),
+    slider("Tilt", m.rotation[0], -180, 180, 1, (v) => { m.rotation[0] = v; app.changed(); }, (v) => `${Math.round(v)}°`),
+    slider("Turn", m.rotation[1], -180, 180, 1, (v) => { m.rotation[1] = v; app.changed(); }, (v) => `${Math.round(v)}°`),
+    slider("Lean", m.rotation[2], -180, 180, 1, (v) => { m.rotation[2] = v; app.changed(); }, (v) => `${Math.round(v)}°`))));
+  if (models.length) {
+    out.push(h("label.check", { style: { marginTop: "10px" } },
+      h("input", { type: "checkbox", checked: f.occludeHead !== false, onchange: (e) => {
+        if (e.target.checked) delete f.occludeHead; else f.occludeHead = false;
+        app.changed();
+      } }),
+      " Hide what's behind the head (e.g. the back of a hat brim)"));
+  }
   return out;
 }
 
