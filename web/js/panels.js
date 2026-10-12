@@ -214,6 +214,13 @@ const MODEL_LIBRARY = [
   { name: "crown", label: "👑 Crown", position: [0, 17, -4], rotation: [-6, 0, 0], size: 16 },
   { name: "sunglasses", label: "🕶️ Sunglasses", position: [0, 1.5, 3.6], rotation: [0, 0, 0], size: 15 },
   { name: "halo", label: "😇 Halo", position: [0, 19, -4], rotation: [-15, 0, 0], size: 17 },
+  { name: "cat-ears", label: "🐱 Cat ears", position: [0.0, 15.82, -4.96], rotation: [0, 0, 0], size: 16.85 },
+  { name: "bunny-ears", label: "🐰 Bunny ears", position: [0.0, 18.0, -4.43], rotation: [0, 0, 0], size: 14.18 },
+  { name: "devil-horns", label: "😈 Devil horns", position: [0.0, 14.81, -2.58], rotation: [0, 0, 0], size: 11.1 },
+  { name: "viking-helmet", label: "🪓 Viking helmet", position: [0.0, 13.43, -5.5], rotation: [0, 0, 0], size: 27.94 },
+  { name: "witch-hat", label: "🧙 Witch hat", position: [0.0, 19.91, -7.16], rotation: [0, 0, 0], size: 27.5 },
+  { name: "cowboy-hat", label: "🤠 Cowboy hat", position: [0.0, 15.1, -6.75], rotation: [0, 0, 0], size: 24.0 },
+  { name: "headphones", label: "🎧 Headphones", position: [0.0, 6.6, -6.0], rotation: [0, 0, 0], size: 21.4 },
 ];
 
 function modelsTab(app) {

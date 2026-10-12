@@ -103,7 +103,7 @@ const app = {
   async addLibraryModel(name) {
     const path = `assets/${name}.glb`;
     if (!state.assets.has(path)) {
-      const blob = await fetch(`models/${name}.glb`).then((r) => r.blob());
+      const blob = await fetch(`models/${name}.glb`, { cache: "no-cache" }).then((r) => r.blob());
       state.assets.set(path, blob);
     }
     return path;
