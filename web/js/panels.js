@@ -240,6 +240,11 @@ const PAINT_LIBRARY = [
   { name: "tiger", label: "🐯 Tiger", blend: "Normal", opacity: 0.9 },
   { name: "glitter", label: "✨ Glitter", blend: "Screen", opacity: 1 },
   { name: "game-day", label: "🏈 Game day", blend: "Multiply", opacity: 0.95 },
+  { name: "vampire", label: "🧛 Vampire", blend: "Normal", opacity: 0.95 },
+  { name: "zombie", label: "🧟 Zombie", blend: "Multiply", opacity: 0.95 },
+  { name: "skeleton", label: "💀 Skeleton", blend: "Normal", opacity: 0.95 },
+  { name: "mummy", label: "🏺 Mummy", blend: "Normal", opacity: 0.95 },
+  { name: "witch-skin", label: "🧙‍♀️ Witch skin", blend: "Multiply", opacity: 0.9 },
 ];
 
 /** The Studio's own 3D models (web/models), with a placement that suits each. */
@@ -256,6 +261,7 @@ const MODEL_LIBRARY = [
   { name: "witch-hat", label: "🧙 Witch hat", position: [0.0, 19.91, -7.16], rotation: [0, 0, 0], size: 27.5 },
   { name: "cowboy-hat", label: "🤠 Cowboy hat", position: [0.0, 15.1, -6.75], rotation: [0, 0, 0], size: 24.0 },
   { name: "headphones", label: "🎧 Headphones", position: [0.0, 6.6, -6.0], rotation: [0, 0, 0], size: 21.4 },
+  { name: "pumpkin-hat", label: "🎃 Pumpkin", position: [0.0, 19.34, -3.89], rotation: [0, 0, 0], size: 16.26 },
 ];
 
 function modelsTab(app) {

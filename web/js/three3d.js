@@ -10,8 +10,16 @@ import { FACE_TRIANGLES, FACE_UV } from "./facemesh.js";
 const HEAD = { y: 2.5, z: -6.5, rx: 7.8, ry: 12.5, rz: 9.5, roundness: 0.6 };
 
 export class FaceModels {
-  constructor(canvas) {
+  /**
+   * [canvas] is the WebGL canvas for models; face paint is copied onto [paintCanvas] (a 2D canvas
+   * under it), which blends with the picture through CSS mix-blend-mode the way the app's
+   * FaceMeshProgram blends with the camera (a transparent WebGL canvas has nothing to multiply).
+   */
+  constructor(canvas, paintCanvas) {
     this.canvas = canvas;
+    this.paintCanvas = paintCanvas;
+    this.paintCtx = paintCanvas.getContext("2d");
+    this.paintBlend = "normal";
     this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -82,13 +90,10 @@ export class FaceModels {
       const m = mesh.material;
       m.map = tex;
       m.opacity = paint.opacity ?? 1;
-      // Same blends as the app (FaceMeshProgram): multiply darkens like makeup, screen glows.
-      if (blend === "Multiply") Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.DstColorFactor, blendDst: THREE.OneMinusSrcAlphaFactor });
-      else if (blend === "Screen") Object.assign(m, { blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcColorFactor });
-      else m.blending = THREE.NormalBlending;
-      m.needsUpdate = true;
       mesh.visible = true;
     });
+    // Multiply / Screen happen when the paint canvas is composited (see the constructor).
+    this.paintBlend = { Multiply: "multiply", Screen: "screen" }[blend] ?? "normal";
     return true;
   }
 
@@ -132,17 +137,21 @@ export class FaceModels {
     if (this.canvas.width !== W || this.canvas.height !== H) this.renderer.setSize(W, H, false);
     const posed = faces.filter((f) => f.pose);
     const painted = this.preparePaint(paintFaces, filter.facePaint, assets);
-    if ((!models.length || !posed.length) && !painted) {
+    if (this.paintCanvas.width !== W || this.paintCanvas.height !== H) Object.assign(this.paintCanvas, { width: W, height: H });
+    this.paintCtx.clearRect(0, 0, W, H);
+    if (painted) {
+      this.renderer.clear();
+      this.renderer.render(this.paintScene, this.paintCamera);
+      this.paintCtx.drawImage(this.canvas, 0, 0);
+      this.paintCanvas.style.mixBlendMode = this.paintBlend;
+      this.cleared = false;
+    }
+    if (!models.length || !posed.length) {
       if (!this.cleared) { this.renderer.clear(); this.cleared = true; }
       return;
     }
     this.renderer.clear();
-    if (painted) this.renderer.render(this.paintScene, this.paintCamera);
     this.cleared = false;
-    if (!models.length || !posed.length) {
-      this.heads.forEach((g) => (g.visible = false));
-      return;
-    }
     // MediaPipe's camera for the whole source, cropped to the view.
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();

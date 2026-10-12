@@ -21,6 +21,7 @@ const glCanvas = $("gl");
 const overlay = $("overlay");
 const ctx = overlay.getContext("2d");
 const threeCanvas = $("three");
+const paintCanvas = $("paint");
 let faceModels = null; // three.js renderer, made when a filter first has 3D models
 const video = $("video");
 
@@ -142,7 +143,12 @@ const app = {
     g.translate(size, 0);
     g.scale(-1, 1);
     g.drawImage(glCanvas, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
-    if (faceModels) g.drawImage(threeCanvas, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
+    if (faceModels) {
+      g.globalCompositeOperation = paintCanvas.style.mixBlendMode === "multiply" || paintCanvas.style.mixBlendMode === "screen" ? paintCanvas.style.mixBlendMode : "source-over";
+      g.drawImage(paintCanvas, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
+      g.globalCompositeOperation = "source-over";
+      g.drawImage(threeCanvas, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
+    }
     g.drawImage(overlay, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
     return setThumbnail(await new Promise((r) => c.toBlob(r, "image/png")));
   },
@@ -199,7 +205,9 @@ $("openFile").addEventListener("change", async (e) => {
     state.filter = filter;
     state.script = script;
     state.assets = assets;
-    state.assetImages = new Map(await Promise.all([...assets].map(async ([p, b]) => [p, await loadImage(URL.createObjectURL(b))])));
+    // Only pictures become images; sounds and .glb models stay as Blobs in state.assets.
+    const pictures = [...assets].filter(([p]) => /\.(png|webp|jpe?g)$/i.test(p));
+    state.assetImages = new Map(await Promise.all(pictures.map(async ([p, b]) => [p, await loadImage(URL.createObjectURL(b))])));
     state.selectedSticker = state.selectedRule = -1;
     app.changed(true);
     toast(`Opened ${filter.name}`);
@@ -289,7 +297,7 @@ function frame() {
   const frames = faces.map((face) => measureFace(face, toView));
   // 3D models on the head (three.js, on its own canvas between the picture and the stickers).
   if (f.models?.length || f.facePaint || faceModels) {
-    faceModels ??= new FaceModels(threeCanvas);
+    faceModels ??= new FaceModels(threeCanvas, paintCanvas);
     // Face paint: the mesh's 468 landmarks in this view's clip space.
     const paintFaces = f.facePaint ? faces.map((face) => {
       const out = new Float32Array(468 * 2);
