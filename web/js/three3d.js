@@ -4,18 +4,24 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
-import { FACE_TRIANGLES, FACE_UV } from "./facemesh.js";
+import { FACE_EXTRA, FACE_EXTRA_ALPHA, FACE_TRIANGLES, FACE_UV } from "./facemesh.js";
 
 // Face paint shading, as in the app's FaceMeshProgram: the skin under each pixel divided by the
 // face's usual brightness (measured at the cheeks, forehead and nose bridge) lights the paint.
 const SHADING = 0.85;
 const REF_POINTS = [50, 280, 151, 6];
+const MESH_VERTICES = 468 + FACE_EXTRA.length / 3;
 const PAINT_VERTEX = `
   uniform vec2 uCrop;
+  attribute float alpha;
   varying vec2 vUv;
   varying vec2 vSkin;
+  varying float vAlpha;
+  varying float vExt;
   void main() {
     vUv = uv;
+    vAlpha = alpha;
+    vExt = alpha < 1.0 ? 1.0 : 0.0; // the forehead/chin extension (it fades out)
     vSkin = 0.5 + position.xy * uCrop * 0.5;
     gl_Position = vec4(position.xy, 0.0, 1.0);
   }`;
@@ -24,15 +30,18 @@ const PAINT_FRAGMENT = `
   uniform sampler2D uSkin;
   uniform vec2 uCrop;
   uniform vec2 uRef[4];
+  uniform float uSkinOn;
   uniform float uShade;
   uniform float uOpacity;
   varying vec2 vUv;
   varying vec2 vSkin;
+  varying float vAlpha;
+  varying float vExt;
   float lum(vec2 p) { return dot(texture2D(uSkin, p).rgb, vec3(0.299, 0.587, 0.114)); }
   void main() {
     vec4 c = texture2D(uTex, vUv);
     vec3 rgb = c.rgb;
-    if (uShade > 0.0) {
+    if (uSkinOn > 0.5) {
       float usual = 0.0;
       for (int i = 0; i < 4; i++) {
         vec2 p = 0.5 + uRef[i] * uCrop * 0.5;
@@ -40,10 +49,12 @@ const PAINT_FRAGMENT = `
           + lum(p + vec2(0.0, 0.006)) + lum(p - vec2(0.0, 0.006));
       }
       usual /= 20.0;
-      float light = clamp(lum(vSkin) / max(usual, 0.05), 0.3, 1.6);
-      rgb *= mix(1.0, light, uShade);
+      float light = lum(vSkin) / max(usual, 0.05);
+      rgb *= mix(1.0, clamp(light, 0.3, 1.6), uShade);
+      // On the extension, much darker than the face usually means hair: fade out there.
+      c.a *= mix(1.0, smoothstep(0.35, 0.65, light), vExt);
     }
-    float a = c.a * uOpacity;
+    float a = c.a * uOpacity * vAlpha;
     gl_FragColor = vec4(rgb * a, a);
   }`;
 
@@ -127,13 +138,14 @@ export class FaceModels {
       let mesh = this.paintMeshes[i];
       if (!mesh) {
         const g = new THREE.BufferGeometry();
-        g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(468 * 3), 3));
+        g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(MESH_VERTICES * 3), 3));
         g.setAttribute("uv", new THREE.BufferAttribute(Float32Array.from(FACE_UV), 2));
+        g.setAttribute("alpha", new THREE.BufferAttribute(Float32Array.from([...new Array(468).fill(1), ...FACE_EXTRA_ALPHA]), 1));
         g.setIndex(FACE_TRIANGLES);
         mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
           uniforms: {
             uTex: { value: null }, uSkin: { value: null }, uCrop: { value: new THREE.Vector2(1, 1) },
-            uRef: { value: [0, 1, 2, 3].map(() => new THREE.Vector2()) }, uShade: { value: 0 }, uOpacity: { value: 1 },
+            uRef: { value: [0, 1, 2, 3].map(() => new THREE.Vector2()) }, uShade: { value: 0 }, uSkinOn: { value: 0 }, uOpacity: { value: 1 },
           },
           vertexShader: PAINT_VERTEX,
           fragmentShader: PAINT_FRAGMENT,
@@ -146,6 +158,11 @@ export class FaceModels {
       }
       const attr = mesh.geometry.attributes.position;
       for (let k = 0; k < 468; k++) attr.setXYZ(k, pos[k * 2], pos[k * 2 + 1], 0);
+      // Up the forehead and under the chin: carried on outwards from the tracked outline (as in the app).
+      for (let k = 0; k < FACE_EXTRA.length / 3; k++) {
+        const o = FACE_EXTRA[k * 3], r = FACE_EXTRA[k * 3 + 1], e = FACE_EXTRA[k * 3 + 2];
+        attr.setXYZ(468 + k, pos[o * 2] + (pos[o * 2] - pos[r * 2]) * e, pos[o * 2 + 1] + (pos[o * 2 + 1] - pos[r * 2 + 1]) * e, 0);
+      }
       attr.needsUpdate = true;
       const u = mesh.material.uniforms;
       u.uTex.value = tex;
@@ -154,6 +171,7 @@ export class FaceModels {
       // already keeps it). uRef: where the face's usual brightness is measured.
       u.uShade.value = source && blend !== "Multiply" ? SHADING : 0;
       u.uSkin.value = this.skin ?? null;
+      u.uSkinOn.value = source ? 1 : 0;
       u.uCrop.value.set(sx ?? 1, sy ?? 1);
       REF_POINTS.forEach((p, k) => u.uRef.value[k].set(pos[p * 2], pos[p * 2 + 1]));
       mesh.visible = true;

@@ -163,6 +163,11 @@ A picture laid over the face mesh: it bends with every blink, smile and head tur
 
 Transparent parts of the picture leave the skin as it is. A square picture of 1024 px is plenty.
 
+The shaded band around the top and bottom of the template is the **extension** (Lensmith 0.12.3+):
+the mesh carries on up the forehead towards the hairline and a little under the chin, fading out
+towards its outer edge and wherever there's hair. Paint into it for full-face looks; older apps just
+don't draw it. Normal and Screen paint also take on the skin's light, shadows and texture.
+
 ## Thumbnail
 
 A package may carry the filter's own picture at the top level: `thumbnail.png`, `thumbnail.jpg`
