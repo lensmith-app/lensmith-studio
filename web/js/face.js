@@ -10,6 +10,9 @@ import {
 const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
 const SEGMENT_MODEL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
+// Face skin (multi-class selfie segmenter), for face paint: the same file the app downloads.
+const SKIN_MODEL = "https://lensmith-app.github.io/lensmith-models/selfie_multiclass_256x256.tflite";
+const FACE_SKIN = 3; // background, hair, body-skin, face-skin, clothes, others
 
 // MediaPipe face mesh landmark indices (same as the app).
 const FOREHEAD = 10, CHIN = 152, NOSE_TIP = 1, BETWEEN_EYES = 168, UPPER_LIP = 13, LOWER_LIP = 14;
@@ -23,6 +26,38 @@ export class FaceTracker {
     this.filters = [];
     this.mask = null;
     this.maskVersion = 0;
+    this.skin = null;
+    this.skinLoading = null;
+  }
+
+  /** Loads the face-skin model the first time a face-paint filter needs it. */
+  prepareSkin() {
+    this.skinLoading ??= FilesetResolver.forVisionTasks(WASM)
+      .then((fileset) => ImageSegmenter.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: SKIN_MODEL, delegate: "CPU" },
+        runningMode: "VIDEO",
+        outputConfidenceMasks: true,
+        outputCategoryMask: false,
+      }))
+      .then((s) => { this.skin = s; })
+      .catch((e) => console.warn("Face skin finding isn't available", e));
+  }
+
+  /** How sure the model is that each pixel of [source] is face skin: {data: Uint8Array (0..255, rows from the top), width, height}, or null. */
+  skinMask(source) {
+    if (!this.skin) return null;
+    let ts = performance.now();
+    if (ts <= this.skinTs) ts = this.skinTs + 1;
+    this.skinTs = ts;
+    const result = this.skin.segmentForVideo(source, ts);
+    const m = result.confidenceMasks?.[FACE_SKIN];
+    if (!m) return null;
+    const f = m.getAsFloat32Array();
+    const data = new Uint8Array(f.length);
+    for (let i = 0; i < f.length; i++) data[i] = Math.max(0, Math.min(255, f[i] * 255));
+    const out = { data, width: m.width, height: m.height };
+    result.close?.();
+    return out;
   }
 
   async init() {

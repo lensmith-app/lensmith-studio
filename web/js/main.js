@@ -308,7 +308,10 @@ function frame() {
       }
       return out;
     }) : [];
-    faceModels.render(faces, f, state.assets, W, H, sx, sy, sw / sh, paintFaces, source);
+    // Face paint only lands on face skin (not hair, hands or things in front of the face).
+    if (f.facePaint) tracker.prepareSkin();
+    const skinMask = f.facePaint && faces.length ? tracker.skinMask(source) : null;
+    faceModels.render(faces, f, state.assets, W, H, sx, sy, sw / sh, paintFaces, source, skinMask);
   }
   // Hands and body (lens.hands / lens.pose), in the same units as toUnits() gives faces.
   const wantHands = !!f.script && M.usesHands(state.script), wantPose = !!f.script && M.usesPose(state.script);

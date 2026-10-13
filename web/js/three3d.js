@@ -31,6 +31,8 @@ const PAINT_FRAGMENT = `
   uniform vec2 uCrop;
   uniform vec2 uRef[4];
   uniform float uSkinOn;
+  uniform sampler2D uFaceSkin;
+  uniform float uMaskOn;
   uniform float uShade;
   uniform float uOpacity;
   varying vec2 vUv;
@@ -51,9 +53,11 @@ const PAINT_FRAGMENT = `
       usual /= 20.0;
       float light = lum(vSkin) / max(usual, 0.05);
       rgb *= mix(1.0, clamp(light, 0.3, 1.6), uShade);
-      // On the extension, much darker than the face usually means hair: fade out there.
-      c.a *= mix(1.0, smoothstep(0.35, 0.65, light), vExt);
+      // Without the skin mask: on the extension, much darker than the face usually means hair.
+      if (uMaskOn < 0.5) c.a *= mix(1.0, smoothstep(0.35, 0.65, light), vExt);
     }
+    // Face skin only (as in the app): hair, hands and things in front of the face stay clean.
+    if (uMaskOn > 0.5) c.a *= smoothstep(0.15, 0.55, texture2D(uFaceSkin, vec2(vSkin.x, 1.0 - vSkin.y)).r);
     float a = c.a * uOpacity * vAlpha;
     gl_FragColor = vec4(rgb * a, a);
   }`;
@@ -120,7 +124,7 @@ export class FaceModels {
    * Builds the paint meshes for [paintFaces] (each: Float32Array of 468 x/y clip positions).
    * [source] is the camera picture and [sx]/[sy] the part of it the view shows, for shading.
    */
-  preparePaint(paintFaces, paint, assets, source, sx, sy) {
+  preparePaint(paintFaces, paint, assets, source, sx, sy, skinMask) {
     this.paintMeshes.forEach((m) => m.visible = false);
     if (!paint || !paintFaces.length) return false;
     const tex = this.paintTexture(paint, assets);
@@ -134,6 +138,17 @@ export class FaceModels {
       }
       this.skin.needsUpdate = true;
     }
+    if (skinMask) {
+      const t = this.faceSkin;
+      if (!t || t.image.width !== skinMask.width || t.image.height !== skinMask.height) {
+        t?.dispose();
+        this.faceSkin = new THREE.DataTexture(skinMask.data, skinMask.width, skinMask.height, THREE.RedFormat, THREE.UnsignedByteType);
+        this.faceSkin.minFilter = this.faceSkin.magFilter = THREE.LinearFilter;
+      } else {
+        t.image.data = skinMask.data;
+      }
+      this.faceSkin.needsUpdate = true;
+    }
     paintFaces.forEach((pos, i) => {
       let mesh = this.paintMeshes[i];
       if (!mesh) {
@@ -145,7 +160,7 @@ export class FaceModels {
         mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
           uniforms: {
             uTex: { value: null }, uSkin: { value: null }, uCrop: { value: new THREE.Vector2(1, 1) },
-            uRef: { value: [0, 1, 2, 3].map(() => new THREE.Vector2()) }, uShade: { value: 0 }, uSkinOn: { value: 0 }, uOpacity: { value: 1 },
+            uRef: { value: [0, 1, 2, 3].map(() => new THREE.Vector2()) }, uShade: { value: 0 }, uSkinOn: { value: 0 }, uFaceSkin: { value: null }, uMaskOn: { value: 0 }, uOpacity: { value: 1 },
           },
           vertexShader: PAINT_VERTEX,
           fragmentShader: PAINT_FRAGMENT,
@@ -172,6 +187,8 @@ export class FaceModels {
       u.uShade.value = source && blend !== "Multiply" ? SHADING : 0;
       u.uSkin.value = this.skin ?? null;
       u.uSkinOn.value = source ? 1 : 0;
+      u.uFaceSkin.value = skinMask ? this.faceSkin : null;
+      u.uMaskOn.value = skinMask ? 1 : 0;
       u.uCrop.value.set(sx ?? 1, sy ?? 1);
       REF_POINTS.forEach((p, k) => u.uRef.value[k].set(pos[p * 2], pos[p * 2 + 1]));
       mesh.visible = true;
@@ -216,11 +233,11 @@ export class FaceModels {
    * Draws [filter]'s models on [faces] (each with a .pose matrix). [sx]/[sy] are the fractions of
    * the source the view shows (a centred crop); [aspect] = source width / height.
    */
-  render(faces, filter, assets, W, H, sx, sy, aspect, paintFaces = [], source = null) {
+  render(faces, filter, assets, W, H, sx, sy, aspect, paintFaces = [], source = null, skinMask = null) {
     const models = filter.models ?? [];
     if (this.canvas.width !== W || this.canvas.height !== H) this.renderer.setSize(W, H, false);
     const posed = faces.filter((f) => f.pose);
-    const painted = this.preparePaint(paintFaces, filter.facePaint, assets, source, sx, sy);
+    const painted = this.preparePaint(paintFaces, filter.facePaint, assets, source, sx, sy, skinMask);
     if (this.paintCanvas.width !== W || this.paintCanvas.height !== H) Object.assign(this.paintCanvas, { width: W, height: H });
     this.paintCtx.clearRect(0, 0, W, H);
     if (painted) {

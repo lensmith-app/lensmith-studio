@@ -168,6 +168,10 @@ the mesh carries on up the forehead towards the hairline and a little under the 
 towards its outer edge and wherever there's hair. Paint into it for full-face looks; older apps just
 don't draw it. Normal and Screen paint also take on the skin's light, shadows and texture.
 
+Paint only lands on **face skin** (Lensmith 0.12.4+): a segmentation model finds it, so hair, hands
+and things held in front of the face (a cup, a phone) stay clean. The model (about 16 MB) is
+downloaded the first time a face-paint filter is used.
+
 ## Thumbnail
 
 A package may carry the filter's own picture at the top level: `thumbnail.png`, `thumbnail.jpg`
